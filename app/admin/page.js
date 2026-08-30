@@ -11,6 +11,7 @@ import {
   query,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
   deleteDoc,
   orderBy,
@@ -38,12 +39,15 @@ import {
   Award,
   Crown,
   Eye,
-  Check
+  Check,
+  Lock
 } from "lucide-react";
 
 export default function AdminPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentRank, setCurrentRank] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState("projects");
   const [loading, setLoading] = useState(true);
 
@@ -69,7 +73,6 @@ export default function AdminPage() {
 
   const presetRoles = ["Scripter", "3D Modeler", "Builder", "Composer", "Animator", "UI/UX Designer", "Web Dev"];
 
-  // 5 Kademeli Yönetim Rütbeleri
   const managementRanks = [
     { name: "CEO", desc: "Tam yetki (Sistem kurucusu)", color: "text-amber-700 bg-amber-50 border-amber-200" },
     { name: "Admin", desc: "Proje inceleme, ekip onay ve duyuru yetkisi", color: "text-blue-700 bg-blue-50 border-blue-200" },
@@ -79,19 +82,41 @@ export default function AdminPage() {
     { name: "Ekip Üyesi", desc: "Standart geliştirici (Sadece kendi işlerini görür)", color: "text-slate-700 bg-slate-100 border-slate-200" }
   ];
 
+  // SIKI GÜVENLİK KONTROLÜ (AUTH & YETKİ KAPISI)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      const isMasterAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase());
-
       if (!user) {
-        router.push("/");
+        router.replace("/");
         return;
       }
 
-      // Yetki kontrolü (CEO, Admin, Moderatör, Forum Yöneticisi erişebilir)
-      fetchData();
-      setCurrentUser(user);
+      try {
+        const isMaster = ADMIN_EMAILS.includes(user.email?.toLowerCase());
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userData = userSnap.exists() ? userSnap.data() : null;
+        const userRank = isMaster ? "CEO" : (userData?.managementRole || "Ekip Üyesi");
+
+        // Admin Masasına sadece yetkili rütbeler girebilir:
+        const hasAccess = isMaster || ["CEO", "Admin", "Moderatör", "Forum Yöneticisi"].includes(userRank);
+
+        if (!hasAccess) {
+          setIsAuthorized(false);
+          setLoading(false);
+          setTimeout(() => router.replace("/"), 2000);
+          return;
+        }
+
+        setCurrentUser(user);
+        setCurrentRank(userRank);
+        setIsAuthorized(true);
+        fetchData();
+      } catch (err) {
+        console.error("Yetki kontrol hatası:", err);
+        setIsAuthorized(false);
+        setLoading(false);
+      }
     });
+
     return () => unsubscribe();
   }, [router]);
 
@@ -116,9 +141,17 @@ export default function AdminPage() {
     }
   };
 
+  // Rütbe İzinleri
+  const canManageRanks = currentRank === "CEO" || ADMIN_EMAILS.includes(currentUser?.email?.toLowerCase());
+  const canReviewProjects = ["CEO", "Admin", "Forum Yöneticisi"].includes(currentRank) || ADMIN_EMAILS.includes(currentUser?.email?.toLowerCase());
+  const canModerateUsers = ["CEO", "Admin", "Moderatör"].includes(currentRank) || ADMIN_EMAILS.includes(currentUser?.email?.toLowerCase());
+
   // Başvuru Onayla ve Rol Ata
   const handleApproveWithRole = async (userId, assignedRole) => {
-    if (!assignedRole || !assignedRole.trim()) return;
+    if (!canModerateUsers && !canReviewProjects) {
+      alert("Bu işlem için yetkiniz yok.");
+      return;
+    }
     try {
       await updateDoc(doc(db, "users", userId), {
         status: "approved",
@@ -132,8 +165,12 @@ export default function AdminPage() {
     }
   };
 
-  // Yönetim Yetkisi / Rütbe Değiştirme
+  // Yönetim Rütbesi Değiştir (Sadece CEO & Master Admin yapabilir)
   const handleSaveUserRank = async () => {
+    if (!canManageRanks) {
+      alert("Yönetim kademesi ve rütbe atama yetkisi yalnızca CEO / Kurucuya aittir.");
+      return;
+    }
     if (!selectedRankUser) return;
     try {
       await updateDoc(doc(db, "users", selectedRankUser.id), {
@@ -147,8 +184,12 @@ export default function AdminPage() {
     }
   };
 
-  // Kullanıcı Durumunu Değiştir
+  // Kullanıcı Durumunu Değiştir (Reddet / Yasakla)
   const handleUserStatusChange = async (userId, newStatus) => {
+    if (!canModerateUsers) {
+      alert("Bu işlem için Moderatör veya üstü yetki gerekir.");
+      return;
+    }
     try {
       await updateDoc(doc(db, "users", userId), { status: newStatus });
       setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
@@ -160,6 +201,10 @@ export default function AdminPage() {
   // Kullanıcıya Uyarı Gönder
   const handleSendWarning = async (e) => {
     e.preventDefault();
+    if (!canModerateUsers) {
+      alert("Uyarı gönderme yetkiniz yok.");
+      return;
+    }
     if (!selectedWarnUser || !warnMessage.trim()) return;
     try {
       await updateDoc(doc(db, "users", selectedWarnUser.id), {
@@ -176,6 +221,10 @@ export default function AdminPage() {
 
   // Kullanıcı Silme
   const handleDeleteUser = async (userId) => {
+    if (!canManageRanks) {
+      alert("Kullanıcı silme yetkisi sadece CEO'ya aittir.");
+      return;
+    }
     if (!confirm("Bu kullanıcıyı sistemden tamamen silmek istediğinize emin misiniz?")) return;
     try {
       await deleteDoc(doc(db, "users", userId));
@@ -185,8 +234,12 @@ export default function AdminPage() {
     }
   };
 
-  // Proje İnceleme Durumu Güncelle
+  // Proje İnceleme Durumu Güncelle (Onay / Red)
   const handleProjectReview = async (projectId, newReviewStatus) => {
+    if (!canReviewProjects) {
+      alert("Proje onaylama ve reddetme yetkiniz yok (Forum Yöneticisi veya üstü rütbe gerekir).");
+      return;
+    }
     try {
       await updateDoc(doc(db, "projects", projectId), {
         reviewStatus: newReviewStatus
@@ -199,6 +252,10 @@ export default function AdminPage() {
 
   // Proje Sil
   const handleDeleteProject = async (projectId) => {
+    if (!canManageRanks && currentRank !== "Admin") {
+      alert("Proje silme yetkisi sadece CEO ve Adminlere aittir.");
+      return;
+    }
     if (!confirm("Bu projeyi tamamen silmek istediğinize emin misiniz?")) return;
     try {
       await deleteDoc(doc(db, "projects", projectId));
@@ -211,11 +268,15 @@ export default function AdminPage() {
   // Duyuru Yayınla
   const handlePublishAnnounce = async (e) => {
     e.preventDefault();
+    if (!canReviewProjects && !canModerateUsers) {
+      alert("Duyuru yayınlama yetkiniz yok.");
+      return;
+    }
     if (!newAnnounce.title.trim()) return;
     try {
       await addDoc(collection(db, "announcements"), {
         ...newAnnounce,
-        author: currentUser?.displayName || "Admin",
+        author: currentUser?.displayName || currentRank || "Yönetici",
         createdAt: serverTimestamp()
       });
       setShowAnnounceModal(false);
@@ -229,7 +290,30 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center text-slate-600 font-sans text-xs">
-        Yönetim Masası Yükleniyor...
+        Yetkiler Doğrulanıyor...
+      </div>
+    );
+  }
+
+  // YETKİSİZ KULLANICI ENGEL EKRANI
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full p-8 rounded-3xl bg-white border border-rose-200 shadow-xl text-center">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">Erişim Reddedildi (403)</h2>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            Bu yönetim masasına sadece <b>CEO, Admin, Moderatör veya Forum Yöneticisi</b> yetkisine sahip kullanıcılar erişebilir. Ana sayfaya yönlendiriliyorsunuz...
+          </p>
+          <Link
+            href="/"
+            className="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+          >
+            Çalışma Alanıma Dön
+          </Link>
+        </div>
       </div>
     );
   }
@@ -260,17 +344,21 @@ export default function AdminPage() {
                 <ShieldCheck className="w-4 h-4 text-slate-700" />
                 True Kinetic Yönetim Masası
               </h1>
-              <p className="text-xs text-slate-500">İş İncelemeleri, Başvurular & Yetki Dağıtımı</p>
+              <p className="text-xs text-slate-500">
+                Giriş Yapan: <b className="text-slate-800">{currentUser?.displayName}</b> • Yetki: <span className="font-bold text-indigo-600 uppercase">[{currentRank}]</span>
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAnnounceModal(true)}
-              className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium flex items-center gap-1.5 hover:bg-slate-800 transition-colors shadow-xs"
-            >
-              <Megaphone className="w-3.5 h-3.5" /> Duyuru Yayınla
-            </button>
+            {(canReviewProjects || canModerateUsers) && (
+              <button
+                onClick={() => setShowAnnounceModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium flex items-center gap-1.5 hover:bg-slate-800 transition-colors shadow-xs"
+              >
+                <Megaphone className="w-3.5 h-3.5" /> Duyuru Yayınla
+              </button>
+            )}
             <button
               onClick={fetchData}
               className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shadow-xs"
@@ -301,7 +389,7 @@ export default function AdminPage() {
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Users className="w-4 h-4" /> Ekip Başvuruları & Yetki Yönetimi ({usersList.length})
+            <Users className="w-4 h-4" /> Ekip Başvuruları & Yetki Masası ({usersList.length})
             {pendingUsers.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
                 {pendingUsers.length}
@@ -310,9 +398,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* ========================================================= */}
-        {/* TAB 1: PROJE & İŞ İNCELEME                                */}
-        {/* ========================================================= */}
+        {/* TAB 1: PROJE & İŞ İNCELEME */}
         {activeTab === "projects" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -392,47 +478,54 @@ export default function AdminPage() {
                         )}
                       </div>
 
+                      {/* ONAY / RED AKSİYONLARI (Yetkiliye Görünür) */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleProjectReview(p.id, "Onaylandı")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              isApproved
-                                ? "bg-emerald-600 text-white"
-                                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            }`}
-                          >
-                            Onayla
-                          </button>
-                          <button
-                            onClick={() => handleProjectReview(p.id, "İnceleniyor")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              isPending
-                                ? "bg-amber-600 text-white"
-                                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                            }`}
-                          >
-                            İnceleniyor
-                          </button>
-                          <button
-                            onClick={() => handleProjectReview(p.id, "Kabul Edilmedi")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              isRejected
-                                ? "bg-rose-600 text-white"
-                                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                            }`}
-                          >
-                            Reddet
-                          </button>
-                        </div>
+                        {canReviewProjects ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleProjectReview(p.id, "Onaylandı")}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                isApproved
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              }`}
+                            >
+                              Onayla
+                            </button>
+                            <button
+                              onClick={() => handleProjectReview(p.id, "İnceleniyor")}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                isPending
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                              }`}
+                            >
+                              İnceleniyor
+                            </button>
+                            <button
+                              onClick={() => handleProjectReview(p.id, "Kabul Edilmedi")}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                isRejected
+                                  ? "bg-rose-600 text-white"
+                                  : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                              }`}
+                            >
+                              Reddet
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">Sadece İnceleme Yetkilileri karar verebilir</span>
+                        )}
 
-                        <button
-                          onClick={() => handleDeleteProject(p.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
-                          title="Sil"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canManageRanks && (
+                          <button
+                            onClick={() => handleDeleteProject(p.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -442,12 +535,10 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 2: EKİP BAŞVURULARI & YETKİ DAĞITIMI                 */}
-        {/* ========================================================= */}
+        {/* TAB 2: EKİP BAŞVURULARI & YETKİ MASASI */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            {/* GELEN BAŞVURULAR */}
+            {/* BAŞVURU DOSYALARI (ONAY BEKLEYENLER) */}
             <div>
               <h2 className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" /> Gelen Ekip Başvuru Dosyaları ({pendingUsers.length})
@@ -489,7 +580,6 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Başvuru Detayları */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                           {app?.aboutMe && (
                             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
@@ -561,13 +651,15 @@ export default function AdminPage() {
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Reddet
                               </button>
-                              <button
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                                title="Sil"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {canManageRanks && (
+                                <button
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                                  title="Sil"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -581,7 +673,7 @@ export default function AdminPage() {
             {/* AKTİF ÜYELER & YÖNETİM YETKİSİ ATAMA */}
             <div>
               <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5" /> Onaylı Ekip Üyeleri ({approvedUsers.length})
+                <Users className="w-3.5 h-3.5" /> Onaylı Ekip Üyeleri & Yetkiler ({approvedUsers.length})
               </h2>
 
               <div className="space-y-2.5">
@@ -601,7 +693,7 @@ export default function AdminPage() {
                             {user.role || "Developer"}
                           </span>
                           
-                          {/* YÖNETİM RÜTBESİ ROZETİ */}
+                          {/* YÖNETİM KADEMESİ ROZETİ */}
                           <span className={`text-[10px] px-2 py-0.5 rounded border font-bold ${rankObj.color}`}>
                             {userRank === "CEO" && "👑 "}
                             {userRank === "Admin" && "🛡️ "}
@@ -624,47 +716,55 @@ export default function AdminPage() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
-                        {/* YETKİ / RÜTBE DEĞİŞTİR BUTONU */}
-                        <button
-                          onClick={() => {
-                            setSelectedRankUser(user);
-                            setSelectedNewRank(user.managementRole || "Ekip Üyesi");
-                            setShowRankModal(true);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-semibold flex items-center gap-1 transition-colors"
-                        >
-                          <Crown className="w-3.5 h-3.5" /> Yetki Ata
-                        </button>
+                        {/* SADECE CEO & MASTER ADMIN YETKİ ATAYABİLİR */}
+                        {canManageRanks && (
+                          <button
+                            onClick={() => {
+                              setSelectedRankUser(user);
+                              setSelectedNewRank(user.managementRole || "Ekip Üyesi");
+                              setShowRankModal(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                          >
+                            <Crown className="w-3.5 h-3.5" /> Yetki Ata
+                          </button>
+                        )}
 
-                        <button
-                          onClick={() => {
-                            setSelectedWarnUser(user);
-                            setWarnMessage(user.warning || "");
-                            setShowWarnModal(true);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-xs font-medium flex items-center gap-1 transition-colors"
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
-                        </button>
+                        {canModerateUsers && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedWarnUser(user);
+                                setWarnMessage(user.warning || "");
+                                setShowWarnModal(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-xs font-medium flex items-center gap-1 transition-colors"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
+                            </button>
 
-                        <button
-                          onClick={() => {
-                            if (confirm(`${user.displayName} adlı kullanıcıyı stüdyodan yasaklamak istediğinize emin misiniz?`)) {
-                              handleUserStatusChange(user.id, "banned");
-                            }
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-medium flex items-center gap-1 transition-colors"
-                        >
-                          <ShieldBan className="w-3.5 h-3.5" /> Yasakla
-                        </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`${user.displayName} adlı kullanıcıyı stüdyodan yasaklamak istediğinize emin misiniz?`)) {
+                                  handleUserStatusChange(user.id, "banned");
+                                }
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-medium flex items-center gap-1 transition-colors"
+                            >
+                              <ShieldBan className="w-3.5 h-3.5" /> Yasakla
+                            </button>
+                          </>
+                        )}
 
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Sil"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canManageRanks && (
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -696,19 +796,23 @@ export default function AdminPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleApproveWithRole(user.id, user.application?.roleApplied || "Developer")}
-                          className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium transition-colors"
-                        >
-                          Yasağı Kaldır & Onayla
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Sil"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canModerateUsers && (
+                          <button
+                            onClick={() => handleApproveWithRole(user.id, user.application?.roleApplied || "Developer")}
+                            className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium transition-colors"
+                          >
+                            Yasağı Kaldır & Onayla
+                          </button>
+                        )}
+                        {canManageRanks && (
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                            title="Sil"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
