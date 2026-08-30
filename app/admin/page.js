@@ -34,7 +34,9 @@ import {
   X,
   ShieldBan,
   AlertTriangle,
-  Send
+  Send,
+  Award,
+  FileCheck
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -55,6 +57,8 @@ export default function AdminPage() {
   const [showWarnModal, setShowWarnModal] = useState(false);
   const [selectedWarnUser, setSelectedWarnUser] = useState(null);
   const [warnMessage, setWarnMessage] = useState("");
+
+  const roles = ["Scripter", "3D Modeler", "Builder", "Animator", "UI/UX Designer", "VFX/SFX Artist", "Web Dev", "Lead Developer"];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -89,7 +93,21 @@ export default function AdminPage() {
     }
   };
 
-  // Kullanıcı Durumunu Değiştir (Onayla / Reddet / Yasakla)
+  // Başvuru Onayla ve Rol Ata
+  const handleApproveWithRole = async (userId, assignedRole) => {
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        status: "approved",
+        role: assignedRole
+      });
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: "approved", role: assignedRole } : u));
+      alert(`Kullanıcı "${assignedRole}" rolüyle onaylandı!`);
+    } catch (err) {
+      alert("Hata: " + err.message);
+    }
+  };
+
+  // Kullanıcı Durumunu Değiştir (Reddet / Yasakla / Askıya Al)
   const handleUserStatusChange = async (userId, newStatus) => {
     try {
       await updateDoc(doc(db, "users", userId), { status: newStatus });
@@ -111,17 +129,6 @@ export default function AdminPage() {
       setShowWarnModal(false);
       setWarnMessage("");
       alert(`${selectedWarnUser.displayName} adlı kullanıcıya uyarı iletildi!`);
-    } catch (err) {
-      alert("Hata: " + err.message);
-    }
-  };
-
-  // Uyarıyı Temizle
-  const handleClearWarning = async (userId) => {
-    try {
-      await updateDoc(doc(db, "users", userId), { warning: null });
-      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, warning: null } : u));
-      alert("Uyarı kaldırıldı.");
     } catch (err) {
       alert("Hata: " + err.message);
     }
@@ -187,7 +194,7 @@ export default function AdminPage() {
     );
   }
 
-  const pendingUsers = usersList.filter(u => u.status === "pending");
+  const pendingUsers = usersList.filter(u => u.status === "pending" || u.status === "unapplied");
   const approvedUsers = usersList.filter(u => u.status === "approved");
   const bannedOrRejectedUsers = usersList.filter(u => u.status === "banned" || u.status === "rejected" || u.status === "suspended");
 
@@ -213,7 +220,7 @@ export default function AdminPage() {
                 <ShieldCheck className="w-4 h-4 text-slate-700" />
                 True Kinetic Yönetim Masası
               </h1>
-              <p className="text-xs text-slate-500">İş İncelemeleri & Ekip Denetimi</p>
+              <p className="text-xs text-slate-500">İş İncelemeleri & Ekip Başvuru Denetimi</p>
             </div>
           </div>
 
@@ -254,7 +261,7 @@ export default function AdminPage() {
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Users className="w-4 h-4" /> Ekip Denetimi & Onay ({usersList.length})
+            <Users className="w-4 h-4" /> Ekip Başvuruları & Üyeler ({usersList.length})
             {pendingUsers.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
                 {pendingUsers.length}
@@ -263,9 +270,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* ========================================================= */}
-        {/* TAB 1: PROJE & İŞ İNCELEME MASASI                         */}
-        {/* ========================================================= */}
+        {/* TAB 1: PROJE & İŞ İNCELEME */}
         {activeTab === "projects" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -345,7 +350,6 @@ export default function AdminPage() {
                         )}
                       </div>
 
-                      {/* ADMIN AKSİYONLARI */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
                           <button
@@ -396,63 +400,125 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 2: EKİP DENETİMİ, UYARI, YASAKLAMA & ON AY           */}
-        {/* ========================================================= */}
+        {/* TAB 2: EKİP BAŞVURULARI & ÜYE YÖNETİMİ */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            {/* 1. ONAY BEKLEYEN BAŞVURULAR (ONAYLA & REDDET) */}
+            {/* DETAYLI BAŞVURU DOSYALARI (ONAY BEKLEYENLER) */}
             <div>
               <h2 className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> Onay Bekleyen Başvurular ({pendingUsers.length})
+                <Clock className="w-3.5 h-3.5" /> Gelen Ekip Başvuru Dosyaları ({pendingUsers.length})
               </h2>
 
               {pendingUsers.length === 0 ? (
                 <div className="p-6 rounded-xl bg-white border border-slate-200 text-center text-xs text-slate-500">
-                  Onay bekleyen ekip başvurusu bulunmuyor.
+                  Onay bekleyen başvuru dosyası bulunmuyor.
                 </div>
               ) : (
-                <div className="space-y-2.5">
-                  {pendingUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="p-4 rounded-xl bg-white border border-amber-200 shadow-xs flex items-center justify-between gap-4"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-slate-900">{user.displayName}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
-                            Başvuru Beklemede
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
-                      </div>
+                <div className="space-y-3">
+                  {pendingUsers.map((user) => {
+                    const app = user.application;
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleUserStatusChange(user.id, "approved")}
-                          className="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-medium flex items-center gap-1 transition-colors"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Onayla
-                        </button>
-                        <button
-                          onClick={() => handleUserStatusChange(user.id, "rejected")}
-                          className="px-3.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-medium flex items-center gap-1 transition-colors"
-                          title="Başvuruyu Reddet"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Reddet
-                        </button>
+                    return (
+                      <div
+                        key={user.id}
+                        className="p-5 rounded-2xl bg-white border border-amber-200 shadow-sm space-y-4"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-base text-slate-900">{user.displayName}</span>
+                              <span className="text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                                {app?.roleApplied || "Başvuru Bekleniyor"}
+                              </span>
+                              {app?.experience && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
+                                  {app.experience}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
+                          </div>
+
+                          <div className="text-xs font-mono text-slate-500 flex items-center gap-2">
+                            <span>Discord: <b className="text-slate-800">{app?.discordTag || "Girilmedi"}</b></span>
+                          </div>
+                        </div>
+
+                        {/* Başvuru Detayları (Hakkında & Portföy) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                          {app?.aboutMe && (
+                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                              <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">Motivasyon / Hakkında</span>
+                              <p className="text-slate-700 leading-relaxed">{app.aboutMe}</p>
+                            </div>
+                          )}
+
+                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">Portföy / Örnek Çalışma</span>
+                              {app?.portfolioUrl ? (
+                                <a
+                                  href={app.portfolioUrl.startsWith("http") ? app.portfolioUrl : `https://${app.portfolioUrl}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-blue-600 font-semibold underline flex items-center gap-1 truncate"
+                                >
+                                  <ExternalLink className="w-3 h-3 shrink-0" /> {app.portfolioUrl}
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 italic">Portföy linki verilmedi</span>
+                              )}
+                            </div>
+
+                            <div className="pt-2 mt-2 border-t border-slate-200/60 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Gizlilik & Telif Sözleşmesi Onaylandı (NDA Signed)</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ROL SEÇEREK ONAYLA VEYA REDDET */}
+                        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0">Rol Ver & Onayla:</span>
+                            {roles.map((r) => (
+                              <button
+                                key={r}
+                                onClick={() => handleApproveWithRole(user.id, r)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-semibold transition-all whitespace-nowrap"
+                              >
+                                {r}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => handleUserStatusChange(user.id, "rejected")}
+                              className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                            >
+                              <XCircle className="w-3.5 h-3.5" /> Başvuruyu Reddet
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                              title="Sil"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* 2. AKTİF ÜYELER (UYARI VER & YASAKLA BUTONLARI) */}
+            {/* AKTİF ÜYELER */}
             <div>
               <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5" /> Aktif Ekip Üyeleri ({approvedUsers.length})
+                <Users className="w-3.5 h-3.5" /> Onaylı Ekip Üyeleri ({approvedUsers.length})
               </h2>
 
               <div className="space-y-2.5">
@@ -464,9 +530,12 @@ export default function AdminPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-slate-900">{user.displayName}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase font-mono">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-semibold font-mono">
                           {user.role || "Developer"}
                         </span>
+                        {user.application?.discordTag && (
+                          <span className="text-[11px] text-slate-400 font-mono">({user.application.discordTag})</span>
+                        )}
                         {user.warning && (
                           <span className="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-medium flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3" /> Uyarılı
@@ -474,13 +543,9 @@ export default function AdminPage() {
                         )}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
-                      {user.warning && (
-                        <p className="text-[11px] text-amber-700 mt-1 italic">Son Uyarı: "{user.warning}"</p>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {/* UYARI BUTONU */}
                       <button
                         onClick={() => {
                           setSelectedWarnUser(user);
@@ -492,7 +557,6 @@ export default function AdminPage() {
                         <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
                       </button>
 
-                      {/* YASAKLA (BAN) BUTONU */}
                       <button
                         onClick={() => {
                           if (confirm(`${user.displayName} adlı kullanıcıyı stüdyodan yasaklamak istediğinize emin misiniz?`)) {
@@ -504,11 +568,10 @@ export default function AdminPage() {
                         <ShieldBan className="w-3.5 h-3.5" /> Yasakla (Ban)
                       </button>
 
-                      {/* SİL BUTONU */}
                       <button
                         onClick={() => handleDeleteUser(user.id)}
                         className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Kullanıcıyı Tamamen Sil"
+                        title="Sil"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -518,11 +581,11 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* 3. YASAKLANAN VEYA REDDEDİLENLER (YASAĞI KALDIR) */}
+            {/* YASAKLANANLAR / REDDEDİLENLER */}
             {bannedOrRejectedUsers.length > 0 && (
               <div>
                 <h2 className="text-xs font-bold text-rose-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <ShieldBan className="w-3.5 h-3.5" /> Yasaklanan / Reddedilenler ({bannedOrRejectedUsers.length})
+                  <ShieldBan className="w-3.5 h-3.5" /> Yasaklananlar & Reddedilenler ({bannedOrRejectedUsers.length})
                 </h2>
 
                 <div className="space-y-2.5">
@@ -543,7 +606,7 @@ export default function AdminPage() {
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleUserStatusChange(user.id, "approved")}
+                          onClick={() => handleApproveWithRole(user.id, user.application?.roleApplied || "Developer")}
                           className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium transition-colors"
                         >
                           Yasağı Kaldır & Onayla
@@ -551,7 +614,7 @@ export default function AdminPage() {
                         <button
                           onClick={() => handleDeleteUser(user.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Kaydı Sil"
+                          title="Sil"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -595,21 +658,9 @@ export default function AdminPage() {
                 </div>
 
                 <div className="flex items-center justify-between gap-2 pt-2">
-                  {selectedWarnUser.warning && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleClearWarning(selectedWarnUser.id);
-                        setShowWarnModal(false);
-                      }}
-                      className="px-3 py-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium"
-                    >
-                      Uyarıyı Temizle
-                    </button>
-                  )}
                   <button
                     type="submit"
-                    className="flex-1 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium flex items-center justify-center gap-1.5 transition-colors"
+                    className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <Send className="w-3.5 h-3.5" /> Uyarıyı İlet
                   </button>

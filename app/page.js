@@ -53,11 +53,12 @@ import {
   ShieldBan,
   RefreshCw,
   Info,
-  AlertTriangle
+  AlertTriangle,
+  FileCheck
 } from "lucide-react";
 
 // ==========================================
-// 1. HUB DASHBOARD (SİLME BUTONU KALDIRILDI)
+// 1. HUB DASHBOARD (ONAYLI ÇALIŞMA ALANI)
 // ==========================================
 function HubDashboard({ currentUser, userData, onLogout }) {
   const [activeTab, setActiveTab] = useState("projects");
@@ -81,21 +82,9 @@ function HubDashboard({ currentUser, userData, onLogout }) {
   ];
 
   const reviewStatuses = {
-    "İnceleniyor": {
-      name: "İnceleniyor",
-      badge: "bg-amber-50 text-amber-700 border-amber-200",
-      icon: Clock
-    },
-    "Onaylandı": {
-      name: "Onaylandı",
-      badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: CheckCircle2
-    },
-    "Kabul Edilmedi": {
-      name: "Kabul Edilmedi",
-      badge: "bg-rose-50 text-rose-700 border-rose-200",
-      icon: XCircle
-    }
+    "İnceleniyor": { name: "İnceleniyor", badge: "bg-amber-50 text-amber-700 border-amber-200", icon: Clock },
+    "Onaylandı": { name: "Onaylandı", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
+    "Kabul Edilmedi": { name: "Kabul Edilmedi", badge: "bg-rose-50 text-rose-700 border-rose-200", icon: XCircle }
   };
 
   const priorityOptions = [
@@ -209,7 +198,6 @@ function HubDashboard({ currentUser, userData, onLogout }) {
     }
   };
 
-  // SADECE GİRİŞ YAPAN KULLANICININ KENDİ İŞLERİ
   const myProjects = allProjects.filter(
     (p) => p.userId === currentUser.uid || p.userEmail === currentUser.email?.toLowerCase() || p.creator === (currentUser.displayName || currentUser.email)
   );
@@ -270,8 +258,6 @@ function HubDashboard({ currentUser, userData, onLogout }) {
 
       {/* ANA ÇALIŞMA ALANI */}
       <main className="max-w-7xl mx-auto px-6 py-8 flex-1 w-full space-y-6">
-        
-        {/* YÖNETİCİ UYARISI (EĞER KULLANICIYA UYARI VERİLDİYSE GÖRÜNÜR) */}
         {userData?.warning && (
           <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 shadow-sm flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -282,7 +268,6 @@ function HubDashboard({ currentUser, userData, onLogout }) {
           </div>
         )}
 
-        {/* GENEL DUYURU BANDI */}
         {announcements.length > 0 && (
           <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -367,7 +352,7 @@ function HubDashboard({ currentUser, userData, onLogout }) {
           </div>
         </div>
 
-        {/* 1. KULLANICININ KENDİ PROJELERİ (SİLME BUTONU KALDIRILDI) */}
+        {/* 1. KULLANICININ KENDİ PROJELERİ */}
         {activeTab === "projects" && (
           <div>
             <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
@@ -414,7 +399,6 @@ function HubDashboard({ currentUser, userData, onLogout }) {
                           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                             {p.workType || "Script"}
                           </span>
-                          
                           <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${reviewObj.badge}`}>
                             <ReviewIcon className="w-3 h-3" />
                             {reviewObj.name}
@@ -443,7 +427,7 @@ function HubDashboard({ currentUser, userData, onLogout }) {
                             rel="noreferrer"
                             className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors mb-3"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" /> Çalışma Linkini Aç (Drive)
+                            <ExternalLink className="w-3.5 h-3.5" /> Çalışma Linkini Aç
                           </a>
                         ) : (
                           <div className="text-[11px] text-slate-400 italic text-center mb-3">
@@ -451,7 +435,6 @@ function HubDashboard({ currentUser, userData, onLogout }) {
                           </div>
                         )}
 
-                        {/* SİLME BUTONU KALDIRILDI - SADECE TARİH BİLGİSİ */}
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                           <span>Ekleyen: {p.creator}</span>
                           <span className="font-mono text-[10px]">Kayıtlı İş</span>
@@ -535,7 +518,7 @@ function HubDashboard({ currentUser, userData, onLogout }) {
                 <label className="block text-slate-700 font-semibold mb-1">Proje / İş Adı *</label>
                 <input
                   type="text"
-                  placeholder="Örn: Cyber Ascent - Ana Harita"
+                  placeholder="Proje veya iş başlığı..."
                   value={newProject.title}
                   onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
@@ -546,7 +529,7 @@ function HubDashboard({ currentUser, userData, onLogout }) {
                 <label className="block text-slate-700 font-semibold mb-1">İşi Yapan</label>
                 <input
                   type="text"
-                  placeholder="Ad Soyad veya Nickname"
+                  placeholder="Ad Soyad / Nickname"
                   value={newProject.worker}
                   onChange={(e) => setNewProject({ ...newProject, worker: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
@@ -645,7 +628,7 @@ function HubDashboard({ currentUser, userData, onLogout }) {
                 <label className="block text-slate-700 font-semibold mb-1">İlgili Proje</label>
                 <input
                   type="text"
-                  placeholder="Örn: Cyber Ascent"
+                  placeholder="Proje adı..."
                   value={newTask.project}
                   onChange={(e) => setNewTask({ ...newTask, project: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
@@ -701,7 +684,195 @@ function HubDashboard({ currentUser, userData, onLogout }) {
 }
 
 // =========================================================
-// 2. YASAKLI / ERİŞİM KISITLI VE ONAY BEKLEME EKRANI
+// 2. DETAYLI BAŞVURU VE SÖZLEŞME ONAY FORMU (YENİ KULLANICI)
+// =========================================================
+function ApplicationFormScreen({ currentUser, userData, onLogout }) {
+  const [appForm, setAppForm] = useState({
+    roleApplied: "Scripter",
+    experience: "1-2 Yıl",
+    discordTag: "",
+    portfolioUrl: "",
+    aboutMe: "",
+    termsAccepted: false
+  });
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const roles = ["Scripter", "3D Modeler", "Builder", "Animator", "UI/UX Designer", "VFX/SFX Artist", "Web Dev"];
+  const expLevels = ["1 Yıldan Az", "1-2 Yıl", "3-4 Yıl", "5+ Yıl (Profesyonel)"];
+
+  const handleApplicationSubmit = async (e) => {
+    e.preventDefault();
+    if (!appForm.termsAccepted) {
+      setErrorMsg("Lütfen stüdyo gizlilik ve telif sözleşmelerini onaylayınız.");
+      return;
+    }
+    if (!appForm.discordTag.trim()) {
+      setErrorMsg("Lütfen Discord kullanıcı adınızı giriniz.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      await updateDoc(doc(db, "users", currentUser.uid), {
+        application: {
+          ...appForm,
+          submittedAt: new Date().toISOString()
+        },
+        status: "pending"
+      });
+    } catch (err) {
+      setErrorMsg("Başvuru gönderilemedi: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 font-sans">
+      <div className="max-w-xl w-full">
+        <div className="text-center mb-6">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm mx-auto mb-2 shadow-xs">
+            TK
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Stüdyo Ekip Başvuru & Kayıt Formu</h1>
+          <p className="text-xs text-slate-500 mt-0.5">True Kinetic Studios Geliştirici & Tasarımcı Katılımı</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl">
+          {errorMsg && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 mb-5">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleApplicationSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1.5">Başvurulan Rol / Uzmanlık</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {roles.map((r) => (
+                  <button
+                    type="button"
+                    key={r}
+                    onClick={() => setAppForm({ ...appForm, roleApplied: r })}
+                    className={`py-2 px-2 rounded-lg border text-xs font-medium transition-all ${
+                      appForm.roleApplied === r
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1.5">Deneyim / Tecrübe Yılı</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {expLevels.map((lvl) => (
+                  <button
+                    type="button"
+                    key={lvl}
+                    onClick={() => setAppForm({ ...appForm, experience: lvl })}
+                    className={`py-2 px-1.5 rounded-lg border text-center text-xs font-medium transition-all ${
+                      appForm.experience === lvl
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Discord Kullanıcı Adınız *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="discord_kullanici_adi"
+                  value={appForm.discordTag}
+                  onChange={(e) => setAppForm({ ...appForm, discordTag: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Portföy / Örnek Çalışma Linki</label>
+                <input
+                  type="text"
+                  placeholder="Devforum, ArtStation, Drive, GitHub"
+                  value={appForm.portfolioUrl}
+                  onChange={(e) => setAppForm({ ...appForm, portfolioUrl: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Kendinizden ve Çalışmalarınızdan Bahsedin</label>
+              <textarea
+                rows="3"
+                placeholder="Hangi projelerde yer aldınız, stüdyoya neler katabilirsiniz..."
+                value={appForm.aboutMe}
+                onChange={(e) => setAppForm({ ...appForm, aboutMe: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800 resize-none"
+              />
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={appForm.termsAccepted}
+                  onChange={(e) => setAppForm({ ...appForm, termsAccepted: e.target.checked })}
+                  className="w-4 h-4 mt-0.5 rounded accent-slate-900"
+                />
+                <span className="text-[11px] text-slate-600 leading-tight">
+                  <Link href="/legal" target="_blank" className="font-semibold text-slate-900 underline">
+                    Telif Hakkı, Fikri Mülkiyet (IP), Gizlilik Sözleşmesi (NDA) ve Stüdyo Ceza Kurallarını
+                  </Link>{" "}
+                  okudum, stüdyo kodlarını veya varlıklarını sızdırmayacağımı (leak) ve kurallara uyacağımı taahhüt ederim.
+                </span>
+              </label>
+            </div>
+
+            <div className="pt-2 space-y-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50"
+              >
+                {loading ? "Gönderiliyor..." : (
+                  <>
+                    <FileCheck className="w-4 h-4" /> Başvuruyu & Sözleşmeyi Onaylayıp Gönder
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onLogout}
+                className="w-full py-2 text-center text-xs text-slate-400 hover:text-slate-600"
+              >
+                Çıkış Yap
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+// 3. YASAKLI / ERİŞİM KISITLI VE ONAY BEKLEME EKRANI
 // =========================================================
 function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh }) {
   const isBanned = userData?.status === "banned" || userData?.status === "suspended";
@@ -711,7 +882,6 @@ function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh }) 
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 font-sans relative overflow-hidden">
       <div className="max-w-md w-full relative z-10">
         <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xl text-center">
-          {/* İkon */}
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border ${
             isBanned || isRejected
               ? "bg-rose-50 border-rose-200 text-rose-600"
@@ -724,56 +894,60 @@ function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh }) 
             )}
           </div>
 
-          {/* Başlık */}
           <h2 className="text-lg font-bold text-slate-900 mb-1">
             {isBanned
               ? "Stüdyodan Yasaklandınız"
               : isRejected
               ? "Başvurunuz Reddedildi"
-              : "Erişim Kısıtlandı: Yetki Onayı Bekleniyor"}
+              : "Başvurunuz İnceleniyor"}
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed mb-6">
             {isBanned
-              ? "Hesabınız kural ihlali veya yönetici kararıyla askıya alınmıştır. Stüdyo sistemlerine erişemezsiniz."
+              ? "Hesabınız kural ihlali veya yönetici kararıyla askıya alınmıştır."
               : isRejected
               ? "Ekip başvurunuz yönetici tarafından onaylanmamıştır."
-              : "True Kinetic Studios dahili çalışma alanına sadece onaylı ekip üyeleri erişebilir."}
+              : "Stüdyo başvuru dosyanız yönetici onay masasına iletildi. Onaylandığında çalışma alanınız otomatik olarak açılacaktır."}
           </p>
 
-          {/* Hesap Detay Tablosu */}
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2 text-xs font-mono text-left mb-6">
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Kullanıcı:</span>
-              <span className="font-semibold text-slate-800">{userData?.displayName || currentUser?.displayName || "Ekip Üyesi"}</span>
+              <span className="font-semibold text-slate-800">{userData?.displayName || currentUser?.displayName || "Aday"}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">E-Posta:</span>
-              <span className="text-slate-600">{currentUser?.email}</span>
-            </div>
+            {userData?.application?.roleApplied && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Başvurulan Rol:</span>
+                <span className="font-semibold text-slate-800">{userData.application.roleApplied}</span>
+              </div>
+            )}
+            {userData?.application?.discordTag && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Discord:</span>
+                <span className="text-slate-600">{userData.application.discordTag}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between pt-1 border-t border-slate-200">
-              <span className="text-slate-400">Erişim Durumu:</span>
+              <span className="text-slate-400">Durum:</span>
               <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${
                 isBanned || isRejected
                   ? "bg-rose-100 text-rose-700"
                   : "bg-amber-100 text-amber-800 flex items-center gap-1"
               }`}>
                 {!isBanned && !isRejected && <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />}
-                {isBanned ? "Yasaklandı (Banned)" : isRejected ? "Reddedildi" : "İnceleme Aşamasında"}
+                {isBanned ? "Yasaklandı (Ban)" : isRejected ? "Reddedildi" : "Yönetici İncelemesinde"}
               </span>
             </div>
           </div>
 
-          {/* Bilgilendirme Notu */}
           <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs flex items-center gap-2 mb-6 text-left">
             <Info className="w-4 h-4 text-slate-500 shrink-0" />
             <span className="text-[11px] leading-tight">
               {isBanned || isRejected
-                ? "İtiraz veya bilgi için stüdyo lideriyle iletişime geçebilirsiniz."
-                : "Yönetici onay verdiği an ekranınız otomatik açılacaktır."}
+                ? "İtiraz için Discord üzerinden stüdyo lideriyle iletişime geçebilirsiniz."
+                : "Yönetici onay verdiği an sayfanız otomatik olarak açılacaktır."}
             </span>
           </div>
 
-          {/* Aksiyon Butonları */}
           <div className="space-y-2">
             {!isBanned && !isRejected && (
               <button
@@ -787,21 +961,23 @@ function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh }) 
               onClick={onLogout}
               className="w-full py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
             >
-              <LogOut className="w-3.5 h-3.5" /> Çıkış Yap / Farklı Hesap
+              <LogOut className="w-3.5 h-3.5" /> Çıkış Yap
             </button>
           </div>
         </div>
 
-        <p className="text-center text-[10px] font-mono text-slate-400 mt-4">
-          🔒 True Kinetic Studios Security Protocol • Gateway v1.0
-        </p>
+        <div className="text-center mt-4">
+          <Link href="/legal" className="text-xs text-slate-400 hover:text-slate-700 underline font-mono">
+            Yasal Sözleşmeler & Stüdyo Kuralları
+          </Link>
+        </div>
       </div>
     </div>
   );
 }
 
 // ==========================================
-// 3. AUTH VE ANA SAYFA KONTROLÜ
+// 4. AUTH VE ANA SAYFA KONTROLÜ
 // ==========================================
 export default function HubAuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -837,7 +1013,7 @@ export default function HubAuthPage() {
               displayName: user.displayName || user.email.split("@")[0],
               email: user.email.toLowerCase(),
               role: isAdmin ? "admin" : "developer",
-              status: isAdmin ? "approved" : "pending",
+              status: isAdmin ? "approved" : "unapplied",
               createdAt: serverTimestamp()
             };
             setDoc(userDocRef, newUserData);
@@ -890,7 +1066,7 @@ export default function HubAuthPage() {
           displayName: formData.displayName || "Ekip Üyesi",
           email: formData.email.toLowerCase(),
           role: isAdmin ? "admin" : "developer",
-          status: isAdmin ? "approved" : "pending",
+          status: isAdmin ? "approved" : "unapplied",
           createdAt: serverTimestamp()
         };
 
@@ -949,7 +1125,18 @@ export default function HubAuthPage() {
     );
   }
 
-  // 2. BEKLEMEDE / YASAKLI / REDDEDİLEN KULLANICI (GÜVENLİK EKRANI)
+  // 2. YENİ KAYDOLDU AMA BAŞVURU DOLDURMADI (BAŞVURU & SÖZLEŞME EKRANI)
+  if (currentUser && userData && userData.status === "unapplied") {
+    return (
+      <ApplicationFormScreen
+        currentUser={currentUser}
+        userData={userData}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // 3. BAŞVURDU AMA ONAY BEKLİYOR / YASAKLI / REDDEDİLDİ (BEKLEME EKRANI)
   if (currentUser && userData && (userData.status === "pending" || userData.status === "banned" || userData.status === "suspended" || userData.status === "rejected")) {
     return (
       <RestrictedAccessScreen
@@ -961,7 +1148,7 @@ export default function HubAuthPage() {
     );
   }
 
-  // 3. GİRİŞ & KAYIT FORMU
+  // 4. GİRİŞ & KAYIT FORMU
   return (
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 font-sans">
       <div className="w-full max-w-sm">
@@ -1021,7 +1208,7 @@ export default function HubAuthPage() {
                     required
                     value={formData.displayName}
                     onChange={handleChange}
-                    placeholder="Adınız"
+                    placeholder="Adınız Soyadınız"
                     className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-slate-800"
                   />
                 </div>
@@ -1038,7 +1225,7 @@ export default function HubAuthPage() {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="ornek@truekinetic.com"
+                  placeholder="ornek@email.com"
                   className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-slate-800"
                 />
               </div>
@@ -1065,10 +1252,16 @@ export default function HubAuthPage() {
               disabled={actionLoading}
               className="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm mt-1 disabled:opacity-50"
             >
-              {actionLoading ? "İşleniyor..." : isLogin ? "Giriş Yap" : "Kayıt Ol"}
+              {actionLoading ? "İşleniyor..." : isLogin ? "Giriş Yap" : "Kayıt Ol & Başvuruya Geç"}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>
+        </div>
+
+        <div className="text-center mt-6">
+          <Link href="/legal" className="text-xs text-slate-400 hover:text-slate-700 underline font-mono">
+            Yasal Sözleşmeler & Kurallar
+          </Link>
         </div>
       </div>
     </div>
