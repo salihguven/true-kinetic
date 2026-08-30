@@ -36,7 +36,9 @@ import {
   AlertTriangle,
   Send,
   Award,
-  FileCheck
+  Crown,
+  Eye,
+  Check
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -53,7 +55,7 @@ export default function AdminPage() {
   // Özel Rol State'leri
   const [customRoles, setCustomRoles] = useState({});
 
-  // Duyuru & Uyarı Modalları
+  // Modallar
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
   const [newAnnounce, setNewAnnounce] = useState({ title: "", content: "" });
 
@@ -61,16 +63,34 @@ export default function AdminPage() {
   const [selectedWarnUser, setSelectedWarnUser] = useState(null);
   const [warnMessage, setWarnMessage] = useState("");
 
+  const [showRankModal, setShowRankModal] = useState(false);
+  const [selectedRankUser, setSelectedRankUser] = useState(null);
+  const [selectedNewRank, setSelectedNewRank] = useState("Ekip Üyesi");
+
   const presetRoles = ["Scripter", "3D Modeler", "Builder", "Composer", "Animator", "UI/UX Designer", "Web Dev"];
+
+  // 5 Kademeli Yönetim Rütbeleri
+  const managementRanks = [
+    { name: "CEO", desc: "Tam yetki (Sistem kurucusu)", color: "text-amber-700 bg-amber-50 border-amber-200" },
+    { name: "Admin", desc: "Proje inceleme, ekip onay ve duyuru yetkisi", color: "text-blue-700 bg-blue-50 border-blue-200" },
+    { name: "Moderatör", desc: "Ekip denetimi, uyarı ve yasaklama yetkisi", color: "text-purple-700 bg-purple-50 border-purple-200" },
+    { name: "Forum Yöneticisi", desc: "İş & Proje Onay/Red verme yetkisi", color: "text-indigo-700 bg-indigo-50 border-indigo-200" },
+    { name: "Group Leader", desc: "Tüm stüdyo projelerini canlı görüntüleme yetkisi", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    { name: "Ekip Üyesi", desc: "Standart geliştirici (Sadece kendi işlerini görür)", color: "text-slate-700 bg-slate-100 border-slate-200" }
+  ];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
+      const isMasterAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase());
+
+      if (!user) {
         router.push("/");
-      } else {
-        setCurrentUser(user);
-        fetchData();
+        return;
       }
+
+      // Yetki kontrolü (CEO, Admin, Moderatör, Forum Yöneticisi erişebilir)
+      fetchData();
+      setCurrentUser(user);
     });
     return () => unsubscribe();
   }, [router]);
@@ -96,19 +116,32 @@ export default function AdminPage() {
     }
   };
 
-  // Başvuru Onayla ve Rol Ata (Özel veya Hazır Rol)
+  // Başvuru Onayla ve Rol Ata
   const handleApproveWithRole = async (userId, assignedRole) => {
-    if (!assignedRole || !assignedRole.trim()) {
-      alert("Lütfen geçerli bir rol seçin veya yazın.");
-      return;
-    }
+    if (!assignedRole || !assignedRole.trim()) return;
     try {
       await updateDoc(doc(db, "users", userId), {
         status: "approved",
-        role: assignedRole.trim()
+        role: assignedRole.trim(),
+        managementRole: "Ekip Üyesi"
       });
-      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: "approved", role: assignedRole.trim() } : u));
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: "approved", role: assignedRole.trim(), managementRole: "Ekip Üyesi" } : u));
       alert(`Kullanıcı "${assignedRole.trim()}" rolüyle onaylandı!`);
+    } catch (err) {
+      alert("Hata: " + err.message);
+    }
+  };
+
+  // Yönetim Yetkisi / Rütbe Değiştirme
+  const handleSaveUserRank = async () => {
+    if (!selectedRankUser) return;
+    try {
+      await updateDoc(doc(db, "users", selectedRankUser.id), {
+        managementRole: selectedNewRank
+      });
+      setUsersList(prev => prev.map(u => u.id === selectedRankUser.id ? { ...u, managementRole: selectedNewRank } : u));
+      setShowRankModal(false);
+      alert(`${selectedRankUser.displayName} adlı kullanıcıya "${selectedNewRank}" yetkisi tanımlandı!`);
     } catch (err) {
       alert("Hata: " + err.message);
     }
@@ -182,7 +215,7 @@ export default function AdminPage() {
     try {
       await addDoc(collection(db, "announcements"), {
         ...newAnnounce,
-        author: currentUser.displayName || "Admin",
+        author: currentUser?.displayName || "Admin",
         createdAt: serverTimestamp()
       });
       setShowAnnounceModal(false);
@@ -227,7 +260,7 @@ export default function AdminPage() {
                 <ShieldCheck className="w-4 h-4 text-slate-700" />
                 True Kinetic Yönetim Masası
               </h1>
-              <p className="text-xs text-slate-500">İş İncelemeleri & Ekip Başvuru Denetimi</p>
+              <p className="text-xs text-slate-500">İş İncelemeleri, Başvurular & Yetki Dağıtımı</p>
             </div>
           </div>
 
@@ -268,7 +301,7 @@ export default function AdminPage() {
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Users className="w-4 h-4" /> Ekip Başvuruları & Üyeler ({usersList.length})
+            <Users className="w-4 h-4" /> Ekip Başvuruları & Yetki Yönetimi ({usersList.length})
             {pendingUsers.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
                 {pendingUsers.length}
@@ -277,7 +310,9 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* TAB 1: PROJE & İŞ İNCELEME */}
+        {/* ========================================================= */}
+        {/* TAB 1: PROJE & İŞ İNCELEME                                */}
+        {/* ========================================================= */}
         {activeTab === "projects" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -407,10 +442,12 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 2: EKİP BAŞVURULARI & ÜYE YÖNETİMİ */}
+        {/* ========================================================= */}
+        {/* TAB 2: EKİP BAŞVURULARI & YETKİ DAĞITIMI                 */}
+        {/* ========================================================= */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            {/* BAŞVURU DOSYALARI (ONAY BEKLEYENLER) */}
+            {/* GELEN BAŞVURULAR */}
             <div>
               <h2 className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" /> Gelen Ekip Başvuru Dosyaları ({pendingUsers.length})
@@ -485,9 +522,8 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* ROL VER & ONAYLA (HAZIR BUTONLAR + ÖZEL ROL YAZMA ALANI) */}
+                        {/* ROL VEREREK ONAYLA */}
                         <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                          {/* Hazır Rol Butonları */}
                           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                             <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0">Hazır Rol:</span>
                             {presetRoles.map((r) => (
@@ -501,7 +537,6 @@ export default function AdminPage() {
                             ))}
                           </div>
 
-                          {/* ÖZEL ROL YAZMA & ONAYLAMA ALANI */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                             <div className="flex items-center gap-2 flex-1">
                               <input
@@ -543,73 +578,101 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* AKTİF ÜYELER */}
+            {/* AKTİF ÜYELER & YÖNETİM YETKİSİ ATAMA */}
             <div>
               <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5" /> Onaylı Ekip Üyeleri ({approvedUsers.length})
               </h2>
 
               <div className="space-y-2.5">
-                {approvedUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-slate-900">{user.displayName}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-semibold font-mono">
-                          {user.role || "Developer"}
-                        </span>
-                        {user.application?.discordTag && (
-                          <span className="text-[11px] text-slate-400 font-mono">({user.application.discordTag})</span>
-                        )}
-                        {user.warning && (
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-medium flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> Uyarılı
+                {approvedUsers.map((user) => {
+                  const userRank = user.managementRole || "Ekip Üyesi";
+                  const rankObj = managementRanks.find(r => r.name === userRank) || managementRanks[5];
+
+                  return (
+                    <div
+                      key={user.id}
+                      className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-slate-900">{user.displayName}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-semibold font-mono">
+                            {user.role || "Developer"}
                           </span>
-                        )}
+                          
+                          {/* YÖNETİM RÜTBESİ ROZETİ */}
+                          <span className={`text-[10px] px-2 py-0.5 rounded border font-bold ${rankObj.color}`}>
+                            {userRank === "CEO" && "👑 "}
+                            {userRank === "Admin" && "🛡️ "}
+                            {userRank === "Group Leader" && "🚀 "}
+                            {userRank === "Forum Yöneticisi" && "📋 "}
+                            {userRank === "Moderatör" && "⚖️ "}
+                            {userRank}
+                          </span>
+
+                          {user.application?.discordTag && (
+                            <span className="text-[11px] text-slate-400 font-mono">({user.application.discordTag})</span>
+                          )}
+                          {user.warning && (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-medium flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> Uyarılı
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* YETKİ / RÜTBE DEĞİŞTİR BUTONU */}
+                        <button
+                          onClick={() => {
+                            setSelectedRankUser(user);
+                            setSelectedNewRank(user.managementRole || "Ekip Üyesi");
+                            setShowRankModal(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Crown className="w-3.5 h-3.5" /> Yetki Ata
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedWarnUser(user);
+                            setWarnMessage(user.warning || "");
+                            setShowWarnModal(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-xs font-medium flex items-center gap-1 transition-colors"
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (confirm(`${user.displayName} adlı kullanıcıyı stüdyodan yasaklamak istediğinize emin misiniz?`)) {
+                              handleUserStatusChange(user.id, "banned");
+                            }
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-medium flex items-center gap-1 transition-colors"
+                        >
+                          <ShieldBan className="w-3.5 h-3.5" /> Yasakla
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedWarnUser(user);
-                          setWarnMessage(user.warning || "");
-                          setShowWarnModal(true);
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-xs font-medium flex items-center gap-1 transition-colors"
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (confirm(`${user.displayName} adlı kullanıcıyı stüdyodan yasaklamak istediğinize emin misiniz?`)) {
-                            handleUserStatusChange(user.id, "banned");
-                          }
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-medium flex items-center gap-1 transition-colors"
-                      >
-                        <ShieldBan className="w-3.5 h-3.5" /> Yasakla (Ban)
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Sil"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* YASAKLANANLAR / REDDEDİLENLER */}
+            {/* YASAKLANANLAR */}
             {bannedOrRejectedUsers.length > 0 && (
               <div>
                 <h2 className="text-xs font-bold text-rose-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -655,6 +718,63 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* YETKİ / RÜTBE ATAMA MODALI */}
+        {showRankModal && selectedRankUser && (
+          <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 p-6 rounded-2xl max-w-md w-full shadow-xl">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-indigo-600" />
+                  {selectedRankUser.displayName} İçin Yetki Ata
+                </h3>
+                <button onClick={() => setShowRankModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2 mb-5">
+                {managementRanks.map((rk) => (
+                  <button
+                    key={rk.name}
+                    type="button"
+                    onClick={() => setSelectedNewRank(rk.name)}
+                    className={`w-full p-3 rounded-xl border text-left flex items-start justify-between gap-3 transition-all ${
+                      selectedNewRank === rk.name
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold text-xs flex items-center gap-1.5">
+                        {rk.name}
+                      </div>
+                      <p className={`text-[11px] mt-0.5 ${selectedNewRank === rk.name ? "text-slate-300" : "text-slate-500"}`}>
+                        {rk.desc}
+                      </p>
+                    </div>
+                    {selectedNewRank === rk.name && <Check className="w-4 h-4 shrink-0 text-white mt-0.5" />}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowRankModal(false)}
+                  className="w-1/3 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleSaveUserRank}
+                  className="flex-1 py-2.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs"
+                >
+                  Yetkiyi Kaydet
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* UYARI GÖNDERME MODALI */}
         {showWarnModal && selectedWarnUser && (
           <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -680,19 +800,14 @@ export default function AdminPage() {
                     onChange={(e) => setWarnMessage(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800 resize-none"
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Bu uyarı kullanıcının çalışma ekranının en üstünde sarı şerit olarak belirecektir.
-                  </p>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 pt-2">
-                  <button
-                    type="submit"
-                    className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Uyarıyı İlet
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Send className="w-3.5 h-3.5" /> Uyarıyı İlet
+                </button>
               </form>
             </div>
           </div>
