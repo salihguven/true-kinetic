@@ -50,6 +50,9 @@ export default function AdminPage() {
   const [projectsList, setProjectsList] = useState([]);
   const [projectFilter, setProjectFilter] = useState("Tümü");
 
+  // Özel Rol State'leri
+  const [customRoles, setCustomRoles] = useState({});
+
   // Duyuru & Uyarı Modalları
   const [showAnnounceModal, setShowAnnounceModal] = useState(false);
   const [newAnnounce, setNewAnnounce] = useState({ title: "", content: "" });
@@ -58,7 +61,7 @@ export default function AdminPage() {
   const [selectedWarnUser, setSelectedWarnUser] = useState(null);
   const [warnMessage, setWarnMessage] = useState("");
 
-  const roles = ["Scripter", "3D Modeler", "Builder", "Animator", "UI/UX Designer", "VFX/SFX Artist", "Web Dev", "Lead Developer"];
+  const presetRoles = ["Scripter", "3D Modeler", "Builder", "Composer", "Animator", "UI/UX Designer", "Web Dev"];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -93,21 +96,25 @@ export default function AdminPage() {
     }
   };
 
-  // Başvuru Onayla ve Rol Ata
+  // Başvuru Onayla ve Rol Ata (Özel veya Hazır Rol)
   const handleApproveWithRole = async (userId, assignedRole) => {
+    if (!assignedRole || !assignedRole.trim()) {
+      alert("Lütfen geçerli bir rol seçin veya yazın.");
+      return;
+    }
     try {
       await updateDoc(doc(db, "users", userId), {
         status: "approved",
-        role: assignedRole
+        role: assignedRole.trim()
       });
-      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: "approved", role: assignedRole } : u));
-      alert(`Kullanıcı "${assignedRole}" rolüyle onaylandı!`);
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: "approved", role: assignedRole.trim() } : u));
+      alert(`Kullanıcı "${assignedRole.trim()}" rolüyle onaylandı!`);
     } catch (err) {
       alert("Hata: " + err.message);
     }
   };
 
-  // Kullanıcı Durumunu Değiştir (Reddet / Yasakla / Askıya Al)
+  // Kullanıcı Durumunu Değiştir
   const handleUserStatusChange = async (userId, newStatus) => {
     try {
       await updateDoc(doc(db, "users", userId), { status: newStatus });
@@ -345,7 +352,7 @@ export default function AdminPage() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline mb-3"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" /> Çalışma Linkini İncele (Drive / Link)
+                            <ExternalLink className="w-3.5 h-3.5" /> Çalışma Linkini İncele
                           </a>
                         )}
                       </div>
@@ -403,7 +410,7 @@ export default function AdminPage() {
         {/* TAB 2: EKİP BAŞVURULARI & ÜYE YÖNETİMİ */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            {/* DETAYLI BAŞVURU DOSYALARI (ONAY BEKLEYENLER) */}
+            {/* BAŞVURU DOSYALARI (ONAY BEKLEYENLER) */}
             <div>
               <h2 className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" /> Gelen Ekip Başvuru Dosyaları ({pendingUsers.length})
@@ -417,6 +424,7 @@ export default function AdminPage() {
                 <div className="space-y-3">
                   {pendingUsers.map((user) => {
                     const app = user.application;
+                    const customRoleVal = customRoles[user.id] || "";
 
                     return (
                       <div
@@ -444,7 +452,7 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* Başvuru Detayları (Hakkında & Portföy) */}
+                        {/* Başvuru Detayları */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                           {app?.aboutMe && (
                             <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
@@ -477,11 +485,12 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* ROL SEÇEREK ONAYLA VEYA REDDET */}
-                        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        {/* ROL VER & ONAYLA (HAZIR BUTONLAR + ÖZEL ROL YAZMA ALANI) */}
+                        <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                          {/* Hazır Rol Butonları */}
                           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                            <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0">Rol Ver & Onayla:</span>
-                            {roles.map((r) => (
+                            <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0">Hazır Rol:</span>
+                            {presetRoles.map((r) => (
                               <button
                                 key={r}
                                 onClick={() => handleApproveWithRole(user.id, r)}
@@ -492,20 +501,39 @@ export default function AdminPage() {
                             ))}
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => handleUserStatusChange(user.id, "rejected")}
-                              className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold flex items-center gap-1 transition-colors"
-                            >
-                              <XCircle className="w-3.5 h-3.5" /> Başvuruyu Reddet
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                              title="Sil"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          {/* ÖZEL ROL YAZMA & ONAYLAMA ALANI */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                            <div className="flex items-center gap-2 flex-1">
+                              <input
+                                type="text"
+                                placeholder="Özel rol yazın (Örn: Lead Composer, Seslendirmen...)"
+                                value={customRoleVal}
+                                onChange={(e) => setCustomRoles({ ...customRoles, [user.id]: e.target.value })}
+                                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-slate-800 flex-1"
+                              />
+                              <button
+                                onClick={() => handleApproveWithRole(user.id, customRoleVal || app?.roleApplied || "Geliştirici")}
+                                className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium whitespace-nowrap shadow-xs"
+                              >
+                                Bu Rolü Ver & Onayla
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={() => handleUserStatusChange(user.id, "rejected")}
+                                className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Reddet
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                                title="Sil"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
