@@ -42,12 +42,14 @@ import {
   Check,
   Lock,
   Sliders,
-  ToggleLeft,
-  ToggleRight
+  Sun,
+  Moon,
+  FileCheck
 } from "lucide-react";
 
 export default function AdminPage() {
   const router = useRouter();
+  const [theme, setTheme] = useState("light");
   const [currentUser, setCurrentUser] = useState(null);
   const [userPermissions, setUserPermissions] = useState({});
   const [isCEO, setIsCEO] = useState(false);
@@ -85,6 +87,20 @@ export default function AdminPage() {
   });
 
   const presetRoles = ["Scripter", "3D Modeler", "Builder", "Composer", "Animator", "UI/UX Designer", "Web Dev"];
+
+  // Tema Senkronizasyonu
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("tk_theme") || "light";
+    setTheme(savedTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    localStorage.setItem("tk_theme", nextTheme);
+  };
+
+  const isDark = theme === "dark";
 
   // SIKI GÜVENLİK VE İZİN KONTROLÜ
   useEffect(() => {
@@ -330,7 +346,9 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center text-slate-600 font-sans text-xs">
+      <div className={`min-h-screen flex items-center justify-center font-sans text-xs ${
+        isDark ? "bg-[#07080b] text-slate-300" : "bg-[#f8fafc] text-slate-600"
+      }`}>
         Yetkiler Doğrulanıyor...
       </div>
     );
@@ -339,18 +357,26 @@ export default function AdminPage() {
   // YETKİSİZ KULLANICI ENGEL EKRANI
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-white border border-rose-200 shadow-xl text-center">
-          <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto mb-4">
+      <div className={`min-h-screen flex items-center justify-center p-6 font-sans transition-colors ${
+        isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
+      }`}>
+        <div className={`max-w-md w-full p-8 rounded-3xl border shadow-xl text-center ${
+          isDark ? "bg-[#0d0f14] border-rose-900/40" : "bg-white border-rose-200"
+        }`}>
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border ${
+            isDark ? "bg-rose-950/40 border-rose-800 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"
+          }`}>
             <Lock className="w-7 h-7" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900 mb-1">Erişim Reddedildi (403)</h2>
-          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+          <h2 className="text-lg font-bold mb-1">Erişim Reddedildi (403)</h2>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
             Bu yönetim masasına sadece CEO tarafından <b>"Yönetim Masası Erişimi"</b> izni verilmiş yetkililer girebilir.
           </p>
           <Link
             href="/"
-            className="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+            className={`inline-block px-4 py-2 rounded-xl text-xs font-semibold ${
+              isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+            }`}
           >
             Çalışma Alanıma Dön
           </Link>
@@ -369,25 +395,31 @@ export default function AdminPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-6 md:p-10 font-sans">
+    <div className={`min-h-screen p-6 md:p-10 font-sans transition-colors duration-200 ${
+      isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
+    }`}>
       <div className="max-w-6xl mx-auto space-y-6">
         {/* ÜST BAR */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+        <div className={`flex items-center justify-between pb-4 border-b ${
+          isDark ? "border-[#1a1d26]" : "border-slate-200"
+        }`}>
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shadow-xs"
+              className={`p-2 rounded-xl border transition-all active:scale-95 shadow-xs ${
+                isDark ? "bg-[#0d0f14] border-[#1a1d26] text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-600 hover:text-slate-900"
+              }`}
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div>
-              <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-slate-700" />
+              <h1 className="text-base font-bold flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-500" />
                 True Kinetic Yönetim Masası
               </h1>
-              <p className="text-xs text-slate-500">
-                Giriş Yapan: <b className="text-slate-800">{currentUser?.displayName}</b> • Unvan:{" "}
-                <span className="font-bold text-indigo-600 uppercase">
+              <p className="text-xs text-slate-400">
+                Giriş Yapan: <b className={isDark ? "text-white" : "text-slate-800"}>{currentUser?.displayName}</b> • Unvan:{" "}
+                <span className="font-bold text-indigo-500 uppercase">
                   [{isCEO ? "👑 CEO / Kurucu" : (currentUser?.customTitle || "Yetkili")}]
                 </span>
               </p>
@@ -395,17 +427,32 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-xl border transition-all active:scale-95 ${
+                isDark ? "bg-[#0d0f14] border-[#1a1d26] text-amber-400 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100 shadow-xs"
+              }`}
+              title={isDark ? "Aydınlık Moda Geç" : "Karanlık Moda Geç"}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
             {(isCEO || userPermissions.canPostAnnouncements) && (
               <button
                 onClick={() => setShowAnnounceModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium flex items-center gap-1.5 hover:bg-slate-800 transition-colors shadow-xs"
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-95 ${
+                  isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+                }`}
               >
                 <Megaphone className="w-3.5 h-3.5" /> Duyuru Yayınla
               </button>
             )}
+
             <button
               onClick={fetchData}
-              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shadow-xs"
+              className={`p-2 rounded-xl border transition-all active:scale-95 ${
+                isDark ? "bg-[#0d0f14] border-[#1a1d26] text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-xs"
+              }`}
               title="Yenile"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -414,23 +461,25 @@ export default function AdminPage() {
         </div>
 
         {/* TAB SEÇİCİ */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+        <div className={`flex items-center gap-2 border-b pb-3 ${
+          isDark ? "border-[#1a1d26]" : "border-slate-200"
+        }`}>
           <button
             onClick={() => setActiveTab("projects")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 ${
               activeTab === "projects"
-                ? "bg-slate-900 text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                ? (isDark ? "bg-white text-slate-950 shadow-xs" : "bg-slate-900 text-white shadow-xs")
+                : (isDark ? "text-slate-400 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100")
             }`}
           >
             <FolderGit2 className="w-4 h-4" /> İş & Proje İnceleme ({projectsList.length})
           </button>
           <button
             onClick={() => setActiveTab("users")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 ${
               activeTab === "users"
-                ? "bg-slate-900 text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                ? (isDark ? "bg-white text-slate-950 shadow-xs" : "bg-slate-900 text-white shadow-xs")
+                : (isDark ? "text-slate-400 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100")
             }`}
           >
             <Users className="w-4 h-4" /> Ekip Başvuruları & Yetki Masası ({usersList.length})
@@ -450,10 +499,10 @@ export default function AdminPage() {
                 <button
                   key={filter}
                   onClick={() => setProjectFilter(filter)}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95 ${
                     projectFilter === filter
-                      ? "bg-slate-800 text-white"
-                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      ? (isDark ? "bg-white text-slate-950 font-bold shadow-xs" : "bg-slate-900 text-white font-bold shadow-xs")
+                      : (isDark ? "bg-[#0d0f14] border border-[#1a1d26] text-slate-400 hover:bg-slate-800" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50")
                   }`}
                 >
                   {filter}
@@ -462,9 +511,11 @@ export default function AdminPage() {
             </div>
 
             {filteredProjects.length === 0 ? (
-              <div className="p-12 rounded-2xl bg-white border border-slate-200 text-center shadow-xs">
-                <FolderGit2 className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <h3 className="text-sm font-semibold text-slate-800">İncelenecek iş bulunamadı</h3>
+              <div className={`p-14 rounded-3xl border text-center shadow-xs ${
+                isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200"
+              }`}>
+                <FolderGit2 className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
+                <h3 className="text-sm font-semibold">İncelenecek iş bulunamadı</h3>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,36 +527,42 @@ export default function AdminPage() {
                   return (
                     <div
                       key={p.id}
-                      className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between"
+                      className={`p-5 rounded-2xl border shadow-sm flex flex-col justify-between transition-all ${
+                        isDark ? "bg-[#0d0f14] border-[#1a1d26] hover:border-slate-700" : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                            isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}>
                             {p.workType || "Script"}
                           </span>
                           <span
-                            className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
                               isApproved
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                ? (isDark ? "bg-emerald-950/40 text-emerald-400 border-emerald-800" : "bg-emerald-50 text-emerald-700 border-emerald-200")
                                 : isRejected
-                                ? "bg-rose-50 text-rose-700 border-rose-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
+                                ? (isDark ? "bg-rose-950/40 text-rose-400 border-rose-800" : "bg-rose-50 text-rose-700 border-rose-200")
+                                : (isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-50 text-amber-700 border-amber-200")
                             }`}
                           >
                             {p.reviewStatus || "İnceleniyor"}
                           </span>
                         </div>
 
-                        <h3 className="text-base font-bold text-slate-900 mb-1">{p.title}</h3>
+                        <h3 className="text-base font-bold mb-1">{p.title}</h3>
 
-                        <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
-                          <User className="w-3.5 h-3.5 text-slate-400" />
-                          İşi Yapan: <span className="font-semibold text-slate-800">{p.worker || p.creator}</span>
-                          <span className="text-slate-400">({p.userEmail || p.creator})</span>
+                        <p className="text-xs text-slate-400 mb-2 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 opacity-60" />
+                          İşi Yapan: <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{p.worker || p.creator}</span>
+                          <span className="text-slate-500">({p.userEmail || p.creator})</span>
                         </p>
 
                         {p.description && (
-                          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 mb-3">
+                          <p className={`text-xs p-3 rounded-xl border mb-3 leading-relaxed ${
+                            isDark ? "bg-[#07080b] border-[#1a1d26] text-slate-300" : "bg-slate-50 border-slate-100 text-slate-600"
+                          }`}>
                             {p.description}
                           </p>
                         )}
@@ -515,55 +572,57 @@ export default function AdminPage() {
                             href={p.workLink.startsWith("http") ? p.workLink : `https://${p.workLink}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline mb-3"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:underline mb-3"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" /> Çalışma Linkini İncele
+                            <ExternalLink className="w-3.5 h-3.5" /> Çalışma Bağlantısını İncele
                           </a>
                         )}
                       </div>
 
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <div className={`pt-3 border-t flex items-center justify-between gap-2 ${
+                        isDark ? "border-[#1a1d26]" : "border-slate-100"
+                      }`}>
                         {(isCEO || userPermissions.canReviewProjects) ? (
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => handleProjectReview(p.id, "Onaylandı")}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
                                 isApproved
                                   ? "bg-emerald-600 text-white"
-                                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                  : (isDark ? "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/60" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")
                               }`}
                             >
                               Onayla
                             </button>
                             <button
                               onClick={() => handleProjectReview(p.id, "İnceleniyor")}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
                                 isPending
                                   ? "bg-amber-600 text-white"
-                                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                  : (isDark ? "bg-amber-950/40 text-amber-400 hover:bg-amber-900/60" : "bg-amber-50 text-amber-700 hover:bg-amber-100")
                               }`}
                             >
                               İnceleniyor
                             </button>
                             <button
                               onClick={() => handleProjectReview(p.id, "Kabul Edilmedi")}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
                                 isRejected
                                   ? "bg-rose-600 text-white"
-                                  : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                  : (isDark ? "bg-rose-950/40 text-rose-400 hover:bg-rose-900/60" : "bg-rose-50 text-rose-700 hover:bg-rose-100")
                               }`}
                             >
                               Reddet
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-400 italic">İnceleme yetkiniz bulunmuyor</span>
+                          <span className="text-[11px] text-slate-500 italic">İnceleme yetkiniz bulunmuyor</span>
                         )}
 
                         {isCEO && (
                           <button
                             onClick={() => handleDeleteProject(p.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
+                            className="p-2 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
                             title="Sil"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -581,14 +640,16 @@ export default function AdminPage() {
         {/* TAB 2: EKİP BAŞVURULARI & CEO İZİN MASASI */}
         {activeTab === "users" && (
           <div className="space-y-6">
-            {/* BAŞVURU DOSYALARI (ONAY BEKLEYENLER) */}
+            {/* BAŞVURU DOSYALARI */}
             <div>
-              <h2 className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <h2 className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" /> Gelen Ekip Başvuru Dosyaları ({pendingUsers.length})
               </h2>
 
               {pendingUsers.length === 0 ? (
-                <div className="p-6 rounded-xl bg-white border border-slate-200 text-center text-xs text-slate-500">
+                <div className={`p-6 rounded-2xl border text-center text-xs text-slate-500 ${
+                  isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200"
+                }`}>
                   Onay bekleyen başvuru dosyası bulunmuyor.
                 </div>
               ) : (
@@ -600,17 +661,25 @@ export default function AdminPage() {
                     return (
                       <div
                         key={user.id}
-                        className="p-5 rounded-2xl bg-white border border-amber-200 shadow-sm space-y-4"
+                        className={`p-5 rounded-2xl border shadow-sm space-y-4 ${
+                          isDark ? "bg-[#0d0f14] border-amber-900/40" : "bg-white border-amber-200"
+                        }`}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b ${
+                          isDark ? "border-[#1a1d26]" : "border-slate-100"
+                        }`}>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-base text-slate-900">{user.displayName}</span>
-                              <span className="text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                              <span className="font-bold text-base">{user.displayName}</span>
+                              <span className={`text-[11px] px-2 py-0.5 rounded-lg border font-semibold ${
+                                isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}>
                                 {app?.roleApplied || "Başvuru Bekleniyor"}
                               </span>
                               {app?.experience && (
-                                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
+                                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
+                                }`}>
                                   {app.experience}
                                 </span>
                               )}
@@ -618,20 +687,24 @@ export default function AdminPage() {
                             <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
                           </div>
 
-                          <div className="text-xs font-mono text-slate-500 flex items-center gap-2">
-                            <span>Discord: <b className="text-slate-800">{app?.discordTag || "Girilmedi"}</b></span>
+                          <div className="text-xs font-mono text-slate-400 flex items-center gap-2">
+                            <span>Discord: <b className={isDark ? "text-slate-200" : "text-slate-800"}>{app?.discordTag || "Girilmedi"}</b></span>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                           {app?.aboutMe && (
-                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                            <div className={`p-3 rounded-xl border ${
+                              isDark ? "bg-[#07080b] border-[#1a1d26] text-slate-300" : "bg-slate-50 border-slate-100 text-slate-700"
+                            }`}>
                               <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">Motivasyon / Hakkında</span>
-                              <p className="text-slate-700 leading-relaxed">{app.aboutMe}</p>
+                              <p className="leading-relaxed">{app.aboutMe}</p>
                             </div>
                           )}
 
-                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
+                          <div className={`p-3 rounded-xl border flex flex-col justify-between ${
+                            isDark ? "bg-[#07080b] border-[#1a1d26]" : "bg-slate-50 border-slate-100"
+                          }`}>
                             <div>
                               <span className="text-[10px] font-semibold uppercase text-slate-400 block mb-1">Portföy / Örnek Çalışma</span>
                               {app?.portfolioUrl ? (
@@ -639,16 +712,16 @@ export default function AdminPage() {
                                   href={app.portfolioUrl.startsWith("http") ? app.portfolioUrl : `https://${app.portfolioUrl}`}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-blue-600 font-semibold underline flex items-center gap-1 truncate"
+                                  className="text-blue-500 font-semibold underline flex items-center gap-1 truncate"
                                 >
                                   <ExternalLink className="w-3 h-3 shrink-0" /> {app.portfolioUrl}
                                 </a>
                               ) : (
-                                <span className="text-slate-400 italic">Portföy linki verilmedi</span>
+                                <span className="text-slate-500 italic">Portföy linki verilmedi</span>
                               )}
                             </div>
 
-                            <div className="pt-2 mt-2 border-t border-slate-200/60 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
+                            <div className="pt-2 mt-2 border-t border-slate-500/20 flex items-center gap-1.5 text-[11px] text-emerald-500 font-medium">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Gizlilik & Telif Sözleşmesi Onaylandı (NDA Signed)</span>
                             </div>
@@ -656,48 +729,58 @@ export default function AdminPage() {
                         </div>
 
                         {/* ROL VEREREK ONAYLA */}
-                        <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                        <div className={`pt-3 border-t space-y-2.5 ${isDark ? "border-[#1a1d26]" : "border-slate-100"}`}>
                           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                             <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0">Hazır Rol:</span>
                             {presetRoles.map((r) => (
                               <button
                                 key={r}
                                 onClick={() => handleApproveWithRole(user.id, r)}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-semibold transition-all whitespace-nowrap"
+                                className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all active:scale-95 whitespace-nowrap ${
+                                  isDark ? "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-800" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border-emerald-200"
+                                }`}
                               >
                                 {r}
                               </button>
                             ))}
                           </div>
 
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-xl border ${
+                            isDark ? "bg-[#07080b] border-[#1a1d26]" : "bg-slate-50 border-slate-100"
+                          }`}>
                             <div className="flex items-center gap-2 flex-1">
                               <input
                                 type="text"
                                 placeholder="Özel rol yazın (Örn: Lead Composer, Seslendirmen...)"
                                 value={customRoleVal}
                                 onChange={(e) => setCustomRoles({ ...customRoles, [user.id]: e.target.value })}
-                                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-slate-800 flex-1"
+                                className={`px-3 py-1.5 rounded-lg border text-xs focus:outline-none flex-1 ${
+                                  isDark ? "bg-[#0d0f14] border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"
+                                }`}
                               />
                               <button
                                 onClick={() => handleApproveWithRole(user.id, customRoleVal || app?.roleApplied || "Geliştirici")}
-                                className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium whitespace-nowrap shadow-xs"
+                                className={`px-3 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-all active:scale-95 ${
+                                  isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+                                }`}
                               >
-                                Bu Rolü Ver & Onayla
+                                Rolü Ver & Onayla
                               </button>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
                               <button
                                 onClick={() => handleUserStatusChange(user.id, "rejected")}
-                                className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 ${
+                                  isDark ? "bg-rose-950/40 border-rose-800 text-rose-400 hover:bg-rose-900/60" : "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100"
+                                }`}
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Reddet
                               </button>
                               {isCEO && (
                                 <button
                                   onClick={() => handleDeleteUser(user.id)}
-                                  className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                                  className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
                                   title="Sil"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -713,9 +796,11 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* AKTİF ÜYELER & CEO ÖZEL İZİN MASASI */}
+            {/* AKTİF ÜYELER & CEO İZİN MASASI */}
             <div>
-              <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <h2 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
                 <Users className="w-3.5 h-3.5" /> Onaylı Ekip Üyeleri & İzin Yönetimi ({approvedUsers.length})
               </h2>
 
@@ -727,28 +812,35 @@ export default function AdminPage() {
                   return (
                     <div
                       key={user.id}
-                      className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      className={`p-4 rounded-2xl border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                        isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200"
+                      }`}
                     >
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm text-slate-900">{user.displayName}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-semibold font-mono">
+                          <span className="font-semibold text-sm">{user.displayName}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold font-mono ${
+                            isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}>
                             {user.role || "Developer"}
                           </span>
                           
                           {/* UNVAN ROZETİ */}
-                          <span className="text-[10px] px-2 py-0.5 rounded border font-bold bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-bold flex items-center gap-1 ${
+                            isDark ? "bg-indigo-950/40 text-indigo-400 border-indigo-800/60" : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                          }`}>
                             {userTitle === "CEO" && "👑 "}
                             {userTitle}
                           </span>
 
-                          {/* İZİN ETİKETLERİ */}
-                          {p.canReviewProjects && <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">İş Onaylayabilir</span>}
-                          {p.canViewAllProjects && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Tüm Projeleri Görür</span>}
-                          {p.canModerateUsers && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Moderatör</span>}
+                          {p.canReviewProjects && <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">İş Onaylayabilir</span>}
+                          {p.canViewAllProjects && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">Tüm Projeleri Görür</span>}
+                          {p.canModerateUsers && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 border border-purple-500/20">Moderatör</span>}
 
                           {user.warning && (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-medium flex items-center gap-1">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-medium flex items-center gap-1 ${
+                              isDark ? "bg-amber-950/40 text-amber-400 border-amber-800" : "bg-amber-100 text-amber-800 border-amber-300"
+                            }`}>
                               <AlertTriangle className="w-3 h-3" /> Uyarılı
                             </span>
                           )}
@@ -761,7 +853,9 @@ export default function AdminPage() {
                         {isCEO && (
                           <button
                             onClick={() => openPermissionModal(user)}
-                            className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                            className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 ${
+                              isDark ? "bg-indigo-950/40 text-indigo-400 border-indigo-800 hover:bg-indigo-900/60" : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                            }`}
                           >
                             <Sliders className="w-3.5 h-3.5" /> İzinleri Ayarla
                           </button>
@@ -775,7 +869,9 @@ export default function AdminPage() {
                                 setWarnMessage(user.warning || "");
                                 setShowWarnModal(true);
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 text-xs font-medium flex items-center gap-1 transition-colors"
+                              className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1 transition-all active:scale-95 ${
+                                isDark ? "bg-amber-950/40 text-amber-400 border-amber-800 hover:bg-amber-900/60" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                              }`}
                             >
                               <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
                             </button>
@@ -786,7 +882,9 @@ export default function AdminPage() {
                                   handleUserStatusChange(user.id, "banned");
                                 }
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-medium flex items-center gap-1 transition-colors"
+                              className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1 transition-all active:scale-95 ${
+                                isDark ? "bg-rose-950/40 text-rose-400 border-rose-800 hover:bg-rose-900/60" : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                              }`}
                             >
                               <ShieldBan className="w-3.5 h-3.5" /> Yasakla
                             </button>
@@ -796,7 +894,7 @@ export default function AdminPage() {
                         {isCEO && (
                           <button
                             onClick={() => handleDeleteUser(user.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
                             title="Sil"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -812,7 +910,7 @@ export default function AdminPage() {
             {/* YASAKLANANLAR */}
             {bannedOrRejectedUsers.length > 0 && (
               <div>
-                <h2 className="text-xs font-bold text-rose-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <ShieldBan className="w-3.5 h-3.5" /> Yasaklananlar & Reddedilenler ({bannedOrRejectedUsers.length})
                 </h2>
 
@@ -820,12 +918,16 @@ export default function AdminPage() {
                   {bannedOrRejectedUsers.map((user) => (
                     <div
                       key={user.id}
-                      className="p-4 rounded-xl bg-white border border-rose-200 shadow-xs flex items-center justify-between gap-4"
+                      className={`p-4 rounded-2xl border shadow-xs flex items-center justify-between gap-4 ${
+                        isDark ? "bg-[#0d0f14] border-rose-900/30" : "bg-white border-rose-200"
+                      }`}
                     >
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-slate-900">{user.displayName}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-medium">
+                          <span className="font-semibold text-sm">{user.displayName}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-medium ${
+                            isDark ? "bg-rose-950/50 text-rose-400 border-rose-800" : "bg-rose-50 text-rose-700 border-rose-200"
+                          }`}>
                             {user.status === "banned" ? "Yasaklandı (Ban)" : "Reddedildi"}
                           </span>
                         </div>
@@ -836,7 +938,9 @@ export default function AdminPage() {
                         {(isCEO || userPermissions.canModerateUsers) && (
                           <button
                             onClick={() => handleApproveWithRole(user.id, user.application?.roleApplied || "Developer")}
-                            className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium transition-colors"
+                            className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all active:scale-95 ${
+                              isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+                            }`}
                           >
                             Yasağı Kaldır & Onayla
                           </button>
@@ -844,7 +948,7 @@ export default function AdminPage() {
                         {isCEO && (
                           <button
                             onClick={() => handleDeleteUser(user.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
                             title="Sil"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -859,43 +963,48 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* CEO İZİN VE RÜTBE DÜZENLEME MODALI */}
+        {/* CEO İZİN VE RÜTBE DÜZENLEME MODALI (SİYAH ÇUBUKSUZ) */}
         {showPermModal && selectedPermUser && (
-          <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 p-6 rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                  <Crown className="w-4 h-4 text-amber-600" />
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className={`border rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden transition-all ${
+              isDark ? "bg-[#0d0f14] border-[#1a1d26] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}>
+              <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                isDark ? "border-[#1a1d26] bg-[#090b0f]" : "border-slate-100 bg-slate-50/50"
+              }`}>
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-500" />
                   {selectedPermUser.displayName} İçin CEO İzin Masası
                 </h3>
-                <button onClick={() => setShowPermModal(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setShowPermModal(false)} className="text-slate-400 hover:text-slate-200 p-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="space-y-4 text-xs">
-                {/* Unvan / Rütbe Adı */}
+              <div className="p-6 space-y-4 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden max-h-[80vh] overflow-y-auto">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Görünecek Unvan / Rütbe Adı</label>
+                  <label className="block font-semibold mb-1">Görünecek Unvan / Rütbe Adı</label>
                   <input
                     type="text"
                     placeholder="Örn: Forum Yöneticisi, Group Leader, Baş Besteci, Admin..."
                     value={editPerms.customTitle}
                     onChange={(e) => setEditPerms({ ...editPerms, customTitle: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none ${
+                      isDark ? "bg-[#07080b] border-[#1a1d26] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                    }`}
                   />
                   <p className="text-[11px] text-slate-400 mt-1">Bu unvan kullanıcının profilinde ve panellerinde rozet olarak görünür.</p>
                 </div>
 
-                {/* TEK TEK AÇILIP KAPANABİLEN İZİNLER */}
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <label className="block text-slate-700 font-bold mb-2">Özel İzin Anahtarları</label>
+                <div className={`space-y-2 pt-3 border-t ${isDark ? "border-[#1a1d26]" : "border-slate-100"}`}>
+                  <label className="block font-bold mb-2">Özel İzin Anahtarları</label>
 
-                  {/* 1. Yönetim Masası Erişimi */}
-                  <label className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition-colors ${
+                    isDark ? "bg-[#07080b] border-[#1a1d26] hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                  }`}>
                     <div>
-                      <div className="font-semibold text-slate-900">🛡️ Yönetim Masasına Erişim (Admin Panel)</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Kullanıcının /admin yönetim paneline girmesine izin verir.</p>
+                      <div className="font-semibold">🛡️ Yönetim Masasına Erişim (Admin Panel)</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Kullanıcının /admin yönetim paneline girmesine izin verir.</p>
                     </div>
                     <input
                       type="checkbox"
@@ -905,11 +1014,12 @@ export default function AdminPage() {
                     />
                   </label>
 
-                  {/* 2. Proje İnceleme (Onay/Red) */}
-                  <label className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition-colors ${
+                    isDark ? "bg-[#07080b] border-[#1a1d26] hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                  }`}>
                     <div>
-                      <div className="font-semibold text-slate-900">📋 Proje & İş İnceleme (Onay / Red)</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Ekip üyelerinin eklediği çalışmaları onaylayabilir veya reddedebilir (Forum Yöneticisi yetkisi).</p>
+                      <div className="font-semibold">📋 Proje & İş İnceleme (Onay / Red)</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Ekip üyelerinin eklediği çalışmaları onaylayabilir veya reddedebilir.</p>
                     </div>
                     <input
                       type="checkbox"
@@ -919,11 +1029,12 @@ export default function AdminPage() {
                     />
                   </label>
 
-                  {/* 3. Tüm Stüdyo Projelerini Görme */}
-                  <label className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition-colors ${
+                    isDark ? "bg-[#07080b] border-[#1a1d26] hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                  }`}>
                     <div>
-                      <div className="font-semibold text-slate-900">🚀 Tüm Stüdyo Projelerini Görme</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Hub ekranında sadece kendi işlerini değil, tüm stüdyonun projelerini canlı izleyebilir (Group Leader yetkisi).</p>
+                      <div className="font-semibold">🚀 Tüm Stüdyo Projelerini Görme</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Hub ekranında tüm stüdyonun projelerini canlı izleyebilir (Group Leader yetkisi).</p>
                     </div>
                     <input
                       type="checkbox"
@@ -933,11 +1044,12 @@ export default function AdminPage() {
                     />
                   </label>
 
-                  {/* 4. Başvuru Onaylama */}
-                  <label className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition-colors ${
+                    isDark ? "bg-[#07080b] border-[#1a1d26] hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                  }`}>
                     <div>
-                      <div className="font-semibold text-slate-900">👥 Ekip Başvurularını Onaylama / Reddetme</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Yeni kaydolan adayların başvuru dosyalarını inceleyip stüdyoya alabilir.</p>
+                      <div className="font-semibold">👥 Ekip Başvurularını Onaylama / Reddetme</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Yeni kaydolan adayların başvuru dosyalarını inceleyip stüdyoya alabilir.</p>
                     </div>
                     <input
                       type="checkbox"
@@ -947,11 +1059,12 @@ export default function AdminPage() {
                     />
                   </label>
 
-                  {/* 5. Moderasyon (Uyarı & Ban) */}
-                  <label className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition-colors ${
+                    isDark ? "bg-[#07080b] border-[#1a1d26] hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                  }`}>
                     <div>
-                      <div className="font-semibold text-slate-900">⚖️ Üye Moderasyonu (Uyarı & Yasaklama)</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Kural ihlali yapan üyelere sarı uyarı şeridi gönderebilir veya stüdyodan yasaklayabilir (Moderatör yetkisi).</p>
+                      <div className="font-semibold">⚖️ Üye Moderasyonu (Uyarı & Yasaklama)</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Kural ihlali yapan üyelere uyarı gönderebilir veya stüdyodan yasaklayabilir.</p>
                     </div>
                     <input
                       type="checkbox"
@@ -961,11 +1074,12 @@ export default function AdminPage() {
                     />
                   </label>
 
-                  {/* 6. Duyuru Yayınlama */}
-                  <label className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <label className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition-colors ${
+                    isDark ? "bg-[#07080b] border-[#1a1d26] hover:bg-slate-800" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                  }`}>
                     <div>
-                      <div className="font-semibold text-slate-900">📢 Duyuru Yayınlama</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Tüm ekibin ekranında görünen stüdyo duyurularını paylaşabilir.</p>
+                      <div className="font-semibold">📢 Duyuru Yayınlama</div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Tüm ekibin ekranında görünen stüdyo duyurularını paylaşabilir.</p>
                     </div>
                     <input
                       type="checkbox"
@@ -976,16 +1090,24 @@ export default function AdminPage() {
                   </label>
                 </div>
 
-                <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
+                <div className={`pt-3 border-t flex items-center justify-end gap-2 ${
+                  isDark ? "border-[#1a1d26]" : "border-slate-100"
+                }`}>
                   <button
+                    type="button"
                     onClick={() => setShowPermModal(false)}
-                    className="w-1/3 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50"
+                    className={`px-3.5 py-2 rounded-xl border font-medium text-xs ${
+                      isDark ? "border-[#1a1d26] text-slate-400 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
                   >
                     İptal
                   </button>
                   <button
+                    type="button"
                     onClick={handleSavePermissions}
-                    className="flex-1 py-2.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs"
+                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 ${
+                      isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+                    }`}
                   >
                     İzinleri Kaydet & Uygula
                   </button>
@@ -997,37 +1119,56 @@ export default function AdminPage() {
 
         {/* UYARI GÖNDERME MODALI */}
         {showWarnModal && selectedWarnUser && (
-          <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 p-6 rounded-2xl max-w-md w-full shadow-xl">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className={`border rounded-3xl max-w-md w-full shadow-2xl overflow-hidden transition-all ${
+              isDark ? "bg-[#0d0f14] border-[#1a1d26] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}>
+              <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                isDark ? "border-[#1a1d26] bg-[#090b0f]" : "border-slate-100 bg-slate-50/50"
+              }`}>
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
                   {selectedWarnUser.displayName} İçin Uyarı
                 </h3>
-                <button onClick={() => setShowWarnModal(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setShowWarnModal(false)} className="text-slate-400 hover:text-slate-200 p-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleSendWarning} className="space-y-4 text-xs">
+              <form onSubmit={handleSendWarning} className="p-6 space-y-4 text-xs">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Uyarı Mesajı</label>
+                  <label className="block font-semibold mb-1">Uyarı Mesajı</label>
                   <textarea
                     rows="3"
                     required
                     placeholder="Örn: Proje teslim tarihlerine dikkat ediniz..."
                     value={warnMessage}
                     onChange={(e) => setWarnMessage(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800 resize-none"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border resize-none focus:outline-none ${
+                      isDark ? "bg-[#07080b] border-[#1a1d26] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Send className="w-3.5 h-3.5" /> Uyarıyı İlet
-                </button>
+                <div className={`pt-3 border-t flex items-center justify-end gap-2 ${
+                  isDark ? "border-[#1a1d26]" : "border-slate-100"
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowWarnModal(false)}
+                    className={`px-3.5 py-2 rounded-xl border font-medium text-xs ${
+                      isDark ? "border-[#1a1d26] text-slate-400 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Uyarıyı İlet
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -1035,46 +1176,69 @@ export default function AdminPage() {
 
         {/* DUYURU MODALI */}
         {showAnnounceModal && (
-          <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 p-6 rounded-2xl max-w-md w-full shadow-xl">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                <h3 className="font-bold text-base text-slate-900">Tüm Ekibe Duyuru Yayınla</h3>
-                <button onClick={() => setShowAnnounceModal(false)} className="text-slate-400 hover:text-slate-600">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className={`border rounded-3xl max-w-md w-full shadow-2xl overflow-hidden transition-all ${
+              isDark ? "bg-[#0d0f14] border-[#1a1d26] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}>
+              <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                isDark ? "border-[#1a1d26] bg-[#090b0f]" : "border-slate-100 bg-slate-50/50"
+              }`}>
+                <h3 className="font-bold text-sm">Tüm Ekibe Duyuru Yayınla</h3>
+                <button onClick={() => setShowAnnounceModal(false)} className="text-slate-400 hover:text-slate-200 p-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handlePublishAnnounce} className="space-y-3.5 text-xs">
+              <form onSubmit={handlePublishAnnounce} className="p-6 space-y-3.5 text-xs">
                 <div>
-                  <label className="block text-slate-600 font-medium mb-1">Duyuru Başlığı</label>
+                  <label className="block font-semibold mb-1">Duyuru Başlığı</label>
                   <input
                     type="text"
                     required
                     placeholder="Örn: Sprint #4 Başladı"
                     value={newAnnounce.title}
                     onChange={(e) => setNewAnnounce({ ...newAnnounce, title: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none ${
+                      isDark ? "bg-[#07080b] border-[#1a1d26] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-600 font-medium mb-1">Açıklama</label>
+                  <label className="block font-semibold mb-1">Açıklama</label>
                   <textarea
                     rows="3"
                     required
                     placeholder="Ekip için notlar..."
                     value={newAnnounce.content}
                     onChange={(e) => setNewAnnounce({ ...newAnnounce, content: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-800 resize-none"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border resize-none focus:outline-none ${
+                      isDark ? "bg-[#07080b] border-[#1a1d26] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-medium text-xs hover:bg-slate-800 mt-2"
-                >
-                  Duyuruyu Yayınla
-                </button>
+                <div className={`pt-3 border-t flex items-center justify-end gap-2 ${
+                  isDark ? "border-[#1a1d26]" : "border-slate-100"
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAnnounceModal(false)}
+                    className={`px-3.5 py-2 rounded-xl border font-medium text-xs ${
+                      isDark ? "border-[#1a1d26] text-slate-400 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="submit"
+                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 ${
+                      isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    Yayınla
+                  </button>
+                </div>
               </form>
             </div>
           </div>
