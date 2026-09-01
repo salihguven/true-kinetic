@@ -1,7 +1,7 @@
 // app/page.js
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { auth, db, ADMIN_EMAILS } from "@/lib/firebase";
 import {
@@ -63,11 +63,16 @@ import {
   Menu,
   LayoutDashboard,
   Sparkle,
-  ShieldQuestion
+  EyeOff,
+  Bot,
+  Send,
+  Loader2
 } from "lucide-react";
 
+const DISCORD_TASK_WEBHOOK = "https://discord.com/api/webhooks/1542226540799197275/hTeTL90ikfLAXdlUg2bfZmDAD3yxUuqJRQhvHK4bhcDFp4ADlTiQh_RjRjQ3fzRrzBQ9";
+
 // =========================================================
-// 1. HUB DASHBOARD (TESLİM TAAHHÜT EKRANLI)
+// 1. HUB DASHBOARD (AI SOHBET ASİSTANLI)
 // =========================================================
 function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -78,16 +83,24 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
 
   const [allProjects, setAllProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
 
   // Modallar
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
-
-  // İŞ TESLİM TAAHHÜT MODALI
   const [showCommitModal, setShowCommitModal] = useState(false);
   const [commitAccepted, setCommitAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // AI CHAT STATE'LERİ
+  const [showAiChat, setShowAiChat] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState([
+    { role: "model", text: "Merhaba! Ben True Kinetic AI Asistanı. Roblox Luau kodlama, 3D modelleme veya stüdyo projeleri hakkında nasıl yardımcı olabilirim?" }
+  ]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const chatEndRef = useRef(null);
 
   const isDark = theme === "dark";
 
@@ -115,14 +128,14 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
       name: "Onaylandı",
       badge: isDark
         ? "bg-emerald-950/40 text-emerald-400 border-emerald-800/60"
-        : "bg-emerald-50 text-emerald-800 border-emerald-200",
+        : "bg-emerald-50 text-emerald-700 border-emerald-200",
       icon: CheckCircle2
     },
     "Kabul Edilmedi": {
       name: "Kabul Edilmedi",
       badge: isDark
         ? "bg-rose-950/40 text-rose-400 border-rose-800/60"
-        : "bg-rose-50 text-rose-800 border-rose-200",
+        : "bg-rose-50 text-rose-700 border-rose-200",
       icon: XCircle
     }
   };
@@ -143,6 +156,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     canPostAnnouncements: true
   } : (userData?.permissions || {});
 
+  const canAssignTasks = isMasterCEO || permissions.canAccessAdmin || permissions.canModerateUsers || permissions.canReviewProjects || permissions.canViewAllProjects;
   const displayRankTitle = isMasterCEO ? "CEO / Kurucu" : (userData?.customTitle || userData?.managementRole || "Ekip Üyesi");
 
   const [newProject, setNewProject] = useState({
@@ -158,8 +172,10 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
   const [newTask, setNewTask] = useState({
     title: "",
     project: "",
-    assignedTo: currentUser?.displayName || "",
-    priority: "Normal"
+    assignedTo: "",
+    assignedToId: "",
+    priority: "Normal",
+    isPrivate: false
   });
 
   useEffect(() => {
@@ -184,14 +200,68 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
       setAnnouncements(list);
     });
 
+    const qUsers = query(collection(db, "users"));
+    const unsubUsers = onSnapshot(qUsers, (snap) => {
+      const uList = [];
+      snap.forEach((d) => {
+        const u = d.data();
+        if (u.status === "approved") {
+          uList.push({ id: d.id, ...u });
+        }
+      });
+      setTeamMembers(uList);
+    });
+
     return () => {
       unsubProjects();
       unsubTasks();
       unsubAnnounce();
+      unsubUsers();
     };
   }, []);
 
-  // 1. ADIM: Formu Doğrula ve Taahhüt Ekranını Aç
+  // AI Mesaj Scroll
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // AI SOHBET MESAJI GÖNDERME (GÜNCELLENMİŞ GÜVENLİ FONKSİYON)
+  const handleSendAiMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isAiLoading) return;
+
+    const userText = chatInput.trim();
+    const updatedMessages = [...chatMessages, { role: "user", text: userText }];
+    setChatMessages(updatedMessages);
+    setChatInput("");
+    setIsAiLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userText,
+          history: updatedMessages.slice(-6)
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Sunucu Hatası (${res.status})`);
+      }
+
+      setChatMessages((prev) => [...prev, { role: "model", text: data.reply }]);
+    } catch (err) {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "model", text: `⚠️ ${err.message}` }
+      ]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const handlePreSubmitProject = (e) => {
     e.preventDefault();
     if (!newProject.title.trim()) {
@@ -202,7 +272,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     setShowCommitModal(true);
   };
 
-  // 2. ADIM: Taahhüt Onaylandıktan Sonra Firestore'a Kaydet
   const handleFinalSubmitProject = async () => {
     if (!commitAccepted) return;
     setIsSubmitting(true);
@@ -238,22 +307,63 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
 
   const handleAddTask = async (e) => {
     e.preventDefault();
+    if (!canAssignTasks) {
+      alert("Görev atama yetkiniz bulunmuyor.");
+      return;
+    }
     if (!newTask.title.trim()) return;
+
     try {
       await addDoc(collection(db, "tasks"), {
         ...newTask,
         completed: false,
-        userId: currentUser.uid,
-        creator: currentUser?.displayName || currentUser?.email || "Ekip Üyesi",
+        creatorId: currentUser.uid,
+        creatorName: currentUser?.displayName || "Lider",
         createdAt: serverTimestamp()
       });
+
+      try {
+        const embedColor = newTask.priority === "Kritik" ? 0xe11d48 : newTask.priority === "Yüksek" ? 0xf59e0b : 0x3b82f6;
+        const payload = {
+          username: "True Kinetic Dispatcher",
+          avatar_url: "https://cdn-icons-png.flaticon.com/512/906/906343.png",
+          embeds: [
+            {
+              title: "📌 Yeni Stüdyo Görevi Atandı!",
+              description: `**Görev:** ${newTask.title}`,
+              color: embedColor,
+              fields: [
+                { name: "👤 Atanan Üye", value: `**${newTask.assignedTo || "Ekip Üyesi"}**`, inline: true },
+                { name: "👑 Atayan Yetkili", value: `**${currentUser?.displayName || "Lider"}**`, inline: true },
+                { name: "⚡ Öncelik", value: `**${newTask.priority || "Normal"}**`, inline: true },
+                { name: "📁 İlgili Proje", value: newTask.project || "Genel Stüdyo", inline: true },
+                { name: "🔒 Gizlilik Durumu", value: newTask.isPrivate ? "Özel / Gizli Görev" : "Herkese Açık", inline: true }
+              ],
+              footer: { text: "True Kinetic Studios • Task Management" },
+              timestamp: new Date().toISOString()
+            }
+          ]
+        };
+
+        await fetch(DISCORD_TASK_WEBHOOK, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (webhookErr) {
+        console.error("Discord webhook bildirimi gönderilemedi:", webhookErr);
+      }
+
       setShowTaskModal(false);
       setNewTask({
         title: "",
         project: allProjects[0]?.title || "",
-        assignedTo: currentUser?.displayName || "",
-        priority: "Normal"
+        assignedTo: "",
+        assignedToId: "",
+        priority: "Normal",
+        isPrivate: false
       });
+      alert("Görev başarıyla atandı ve Discord sunucusuna bildirildi! 🚀");
     } catch (err) {
       alert("Görev eklenemedi: " + err.message);
     }
@@ -276,6 +386,14 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     return (p.reviewStatus || "İnceleniyor") === projectFilter;
   });
 
+  const displayedTasks = tasks.filter((t) => {
+    if (canAssignTasks) return true;
+    if (t.isPrivate) {
+      return t.assignedToId === currentUser.uid || t.assignedTo === currentUser.displayName;
+    }
+    return true;
+  });
+
   const approvedCount = displayedProjects.filter(p => p.reviewStatus === "Onaylandı").length;
   const pendingCount = displayedProjects.filter(p => (p.reviewStatus || "İnceleniyor") === "İnceleniyor").length;
   const rejectedCount = displayedProjects.filter(p => p.reviewStatus === "Kabul Edilmedi").length;
@@ -286,9 +404,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     <div className={`min-h-screen flex font-sans transition-colors duration-200 overflow-x-hidden ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
     }`}>
-      {/* ========================================================= */}
-      {/* SOL DİKEY SIDEBAR (YAN BAR)                               */}
-      {/* ========================================================= */}
+      {/* SOL DİKEY SIDEBAR */}
       <aside className={`w-64 border-r shrink-0 flex flex-col justify-between p-5 transition-all duration-200 md:flex sticky top-0 h-screen ${
         isMobileMenuOpen ? "fixed inset-y-0 left-0 z-50 shadow-2xl flex" : "hidden md:flex"
       } ${
@@ -374,7 +490,20 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                 <CheckSquare className="w-4 h-4" />
                 <span>Görev Listesi</span>
               </div>
-              <span className="text-[10px] font-mono opacity-80">{tasks.length}</span>
+              <span className="text-[10px] font-mono opacity-80">{displayedTasks.length}</span>
+            </button>
+
+            {/* AI ASİSTANI MENÜ BUTONU */}
+            <button
+              onClick={() => { setShowAiChat(true); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition-all border ${
+                isDark
+                  ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-300 hover:bg-indigo-900/40"
+                  : "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+              }`}
+            >
+              <Bot className="w-4 h-4 text-indigo-500" />
+              <span>Stüdyo AI Asistanı</span>
             </button>
 
             {permissions.canAccessAdmin && (
@@ -425,9 +554,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       </aside>
 
-      {/* ========================================================= */}
-      {/* SAĞ İÇERİK ALANI                                          */}
-      {/* ========================================================= */}
+      {/* SAĞ İÇERİK ALANI */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className={`md:hidden flex items-center justify-between p-4 border-b ${
           isDark ? "border-[#1a1d26] bg-[#0d0f14]" : "border-slate-200 bg-white"
@@ -439,13 +566,18 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
             <Menu className="w-5 h-5" />
           </button>
           <span className="font-bold text-xs">True Kinetic Hub</span>
-          <button onClick={toggleTheme} className="p-1.5 text-slate-500">
-            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowAiChat(true)} className="p-1.5 text-indigo-500">
+              <Bot className="w-4 h-4" />
+            </button>
+            <button onClick={toggleTheme} className="p-1.5 text-slate-500">
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         <main className="flex-1 p-6 md:p-8 max-w-6xl w-full mx-auto space-y-6">
-          {/* 1. KARŞILAMA VE HOŞ GELDİN KARTI */}
+          {/* KARŞILAMA VE HOŞ GELDİN KARTI */}
           <div className={`p-6 sm:p-7 rounded-3xl border relative overflow-hidden transition-all shadow-xs ${
             isDark
               ? "bg-gradient-to-br from-[#0d0f14] via-[#090b0f] to-[#07080b] border-[#1a1d26]"
@@ -474,19 +606,22 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                 >
                   <Plus className="w-4 h-4" /> Yeni İş Yükle
                 </button>
-                <button
-                  onClick={() => setShowTaskModal(true)}
-                  className={`px-3.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
-                    isDark ? "bg-[#111318] border-[#1a1d26] text-slate-300 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <CheckSquare className="w-3.5 h-3.5" /> Görev Aç
-                </button>
+
+                {canAssignTasks && (
+                  <button
+                    onClick={() => setShowTaskModal(true)}
+                    className={`px-3.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                      isDark ? "bg-[#111318] border-[#1a1d26] text-slate-300 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <CheckSquare className="w-3.5 h-3.5 text-indigo-500" /> Ekibe Görev Ata
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 2. GİZLENEBİLİR YÖNETİM UYARISI */}
+          {/* GİZLENEBİLİR YÖNETİM UYARISI */}
           {hasValidWarning && !isWarningDismissed && (
             <div className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-3.5 shadow-sm ${
               isDark
@@ -570,7 +705,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
             </div>
           </div>
 
-          {/* İÇERİK ALANI (PROJELER / GÖREVLER) */}
+          {/* İÇERİK ALANI */}
           {activeTab !== "tasks" ? (
             <div className="space-y-4 pt-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -715,16 +850,18 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
             </div>
           ) : (
             <div className="space-y-2.5 pt-2">
-              {tasks.length === 0 ? (
+              {displayedTasks.length === 0 ? (
                 <div className={`p-14 rounded-3xl border text-center shadow-xs ${
                   isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80"
                 }`}>
                   <CheckSquare className="w-10 h-10 text-slate-500 mx-auto mb-2.5 opacity-60" />
                   <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Açık görev bulunmuyor</h3>
-                  <p className="text-xs text-slate-400 mt-1">Ekip için yeni bir sprint görevi tanımlayın.</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {canAssignTasks ? "Ekip üyelerine yeni bir sprint görevi atayın." : "Size atanmış aktif bir görev bulunmuyor."}
+                  </p>
                 </div>
               ) : (
-                tasks.map((task) => {
+                displayedTasks.map((task) => {
                   const priorityObj = priorityOptions.find(pr => pr.name === task.priority) || priorityOptions[0];
 
                   return (
@@ -748,12 +885,20 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                           {task.completed && <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />}
                         </button>
                         <div>
-                          <span className={`text-xs font-semibold ${task.completed ? "line-through text-slate-500" : (isDark ? "text-white" : "text-slate-900")}`}>
-                            {task.title}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-semibold ${task.completed ? "line-through text-slate-500" : (isDark ? "text-white" : "text-slate-900")}`}>
+                              {task.title}
+                            </span>
+                            {task.isPrivate && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-500 font-medium flex items-center gap-1">
+                                <EyeOff className="w-3 h-3" /> Gizli
+                              </span>
+                            )}
+                          </div>
+
                           <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                             {task.project && <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-600"}`}>[{task.project}]</span>}
-                            {task.assignedTo && <span>• {task.assignedTo}</span>}
+                            {task.assignedTo && <span>• Atanan: <b>{task.assignedTo}</b></span>}
                             <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${priorityObj.color}`}>
                               {task.priority || "Normal"}
                             </span>
@@ -769,9 +914,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </main>
       </div>
 
-      {/* ========================================================= */}
-      {/* 1.3 PROJE / İŞ EKLE FORMU                                 */}
-      {/* ========================================================= */}
+      {/* PROJE / İŞ EKLE FORMU */}
       {showProjectModal && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden transition-all ${
@@ -792,7 +935,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </button>
             </div>
 
-            <form onSubmit={handlePreSubmitProject} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handlePreSubmitProject} className="p-6 space-y-4 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <div>
                 <label className="block font-semibold mb-1">Proje / İş Başlığı *</label>
                 <input
@@ -907,9 +1050,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 1.4 YENİ: ÇALIŞMA TESLİM VE TELİF TAAHHÜT UYARI MODALI    */}
-      {/* ========================================================= */}
+      {/* ÇALIŞMA TESLİM VE TELİF TAAHHÜT UYARI MODALI */}
       {showCommitModal && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-md w-full shadow-2xl p-6 sm:p-7 space-y-4 transition-all ${
@@ -927,7 +1068,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </div>
             </div>
 
-            {/* Proje Özet Şeridi */}
             <div className={`p-3 rounded-xl border text-xs font-mono space-y-1 ${
               isDark ? "bg-[#07080b] border-[#1a1d26]" : "bg-slate-50 border-slate-200"
             }`}>
@@ -941,7 +1081,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </div>
             </div>
 
-            {/* Kurallar ve Taahhütler Listesi */}
             <div className="space-y-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -957,7 +1096,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </div>
             </div>
 
-            {/* Zorunlu Onay Kutusu */}
             <div className={`p-3.5 rounded-2xl border ${
               isDark ? "bg-[#07080b] border-[#1a1d26]" : "bg-slate-50 border-slate-200"
             }`}>
@@ -974,7 +1112,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </label>
             </div>
 
-            {/* Butonlar */}
             <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
@@ -1004,16 +1141,22 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       )}
 
-      {/* GÖREV EKLE MODALI */}
-      {showTaskModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {/* GÖREV ATAMA MODALI (DISCORD ENTEGRELİ) */}
+      {showTaskModal && canAssignTasks && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-md w-full shadow-2xl overflow-hidden transition-all ${
             isDark ? "bg-[#0d0f14] border-[#1a1d26] text-white" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className={`px-6 py-4 border-b flex items-center justify-between ${
               isDark ? "border-[#1a1d26] bg-[#090b0f]" : "border-slate-100 bg-slate-50/50"
             }`}>
-              <h3 className="font-bold text-sm">Yeni Görev Ekle</h3>
+              <div>
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                  Ekibe Görev Ata
+                </h3>
+                <p className="text-[11px] text-slate-400">Atanan görev otomatik olarak Discord'a bildirilecektir</p>
+              </div>
               <button onClick={() => setShowTaskModal(false)} className="text-slate-400 hover:text-slate-200 p-1">
                 <X className="w-4 h-4" />
               </button>
@@ -1024,7 +1167,8 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                 <label className="block font-semibold mb-1">Görev Başlığı *</label>
                 <input
                   type="text"
-                  placeholder="Yapılacak işi yazın..."
+                  required
+                  placeholder="Örn: Araç Süspansiyon Scriptini Tamamla..."
                   value={newTask.title}
                   onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                   className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none ${
@@ -1034,25 +1178,38 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">İlgili Proje</label>
-                <input
-                  type="text"
-                  placeholder="Proje adı..."
-                  value={newTask.project}
-                  onChange={(e) => setNewTask({ ...newTask, project: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none ${
+                <label className="block font-semibold mb-1">Görevin Atanacağı Üye *</label>
+                <select
+                  required
+                  value={newTask.assignedToId}
+                  onChange={(e) => {
+                    const member = teamMembers.find(m => m.id === e.target.value);
+                    setNewTask({
+                      ...newTask,
+                      assignedToId: e.target.value,
+                      assignedTo: member ? member.displayName : ""
+                    });
+                  }}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none text-xs font-medium cursor-pointer ${
                     isDark ? "bg-[#07080b] border-[#1a1d26] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
                   }`}
-                />
+                >
+                  <option value="">Ekip Üyesi Seçiniz...</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.displayName} ({m.role || "Geliştirici"} - {m.customTitle || m.managementRole || "Üye"})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Atanan Kişi</label>
+                <label className="block font-semibold mb-1">İlgili Proje Adı</label>
                 <input
                   type="text"
-                  placeholder="Ad Soyad"
-                  value={newTask.assignedTo}
-                  onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                  placeholder="Örn: Cyber Ascent"
+                  value={newTask.project}
+                  onChange={(e) => setNewTask({ ...newTask, project: e.target.value })}
                   className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none ${
                     isDark ? "bg-[#07080b] border-[#1a1d26] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
                   }`}
@@ -1082,6 +1239,25 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                 </div>
               </div>
 
+              <div className={`p-3 rounded-xl border ${
+                isDark ? "bg-[#07080b] border-[#1a1d26]" : "bg-slate-50 border-slate-200"
+              }`}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newTask.isPrivate}
+                    onChange={(e) => setNewTask({ ...newTask, isPrivate: e.target.checked })}
+                    className="w-4 h-4 rounded accent-slate-900 cursor-pointer"
+                  />
+                  <div>
+                    <span className="font-semibold text-xs flex items-center gap-1">
+                      <EyeOff className="w-3.5 h-3.5 text-indigo-500" /> Sadece Atanan Kişi Görsün (Özel Görev)
+                    </span>
+                    <p className="text-[10px] text-slate-400">İşaretlenirse diğer ekip üyelerinin panosunda gizlenir.</p>
+                  </div>
+                </label>
+              </div>
+
               <div className={`pt-3 border-t flex items-center justify-end gap-2 ${
                 isDark ? "border-[#1a1d26]" : "border-slate-100"
               }`}>
@@ -1100,9 +1276,101 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                     isDark ? "bg-white hover:bg-slate-200 text-slate-950" : "bg-slate-900 hover:bg-slate-800 text-white"
                   }`}
                 >
-                  Görevi Kaydet
+                  Görevi Ata & Discord'a Bildir
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI ASİSTANI SOHBET MODALI */}
+      {showAiChat && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`border rounded-3xl max-w-xl w-full h-[600px] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden transition-all ${
+            isDark ? "bg-[#0d0f14] border-[#1a1d26] text-white" : "bg-white border-slate-200 text-slate-900"
+          }`}>
+            <div className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${
+              isDark ? "border-[#1a1d26] bg-[#090b0f]" : "border-slate-100 bg-slate-50/70"
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-500 flex items-center justify-center">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm flex items-center gap-1.5">
+                    True Kinetic AI Stüdyo Asistanı
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-mono">
+                      Gemini Online
+                    </span>
+                  </h3>
+                  <p className="text-[10px] text-slate-400">Luau Scripting, 3D Modelleme & Hata Ayıklama Desteği</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAiChat(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto space-y-4 text-xs [scrollbar-width:thin]">
+              {chatMessages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {msg.role === "model" && (
+                    <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <Bot className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+
+                  <div
+                    className={`p-3.5 rounded-2xl max-w-[80%] leading-relaxed whitespace-pre-wrap ${
+                      msg.role === "user"
+                        ? (isDark ? "bg-white text-slate-950 font-medium" : "bg-slate-900 text-white font-medium")
+                        : (isDark ? "bg-[#07080b] border border-[#1a1d26] text-slate-200" : "bg-slate-50 border border-slate-200 text-slate-800")
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+
+              {isAiLoading && (
+                <div className="flex items-center gap-2 text-slate-400 text-xs italic">
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                  <span>Stüdyo asistanı düşünüyor ve yanıt hazırlıyor...</span>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <form onSubmit={handleSendAiMessage} className={`p-4 border-t flex items-center gap-2 shrink-0 ${
+              isDark ? "border-[#1a1d26] bg-[#090b0f]" : "border-slate-100 bg-slate-50/50"
+            }`}>
+              <input
+                type="text"
+                placeholder="Örn: Roblox Luau DataStore scripti nasıl yazılır? Veya 3D rigging ipuçları..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                disabled={isAiLoading}
+                className={`flex-1 px-4 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2 transition-all ${
+                  isDark ? "bg-[#07080b] border-[#1a1d26] text-white focus:ring-white/10" : "bg-white border-slate-200 text-slate-900 focus:ring-slate-900/10"
+                }`}
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || isAiLoading}
+                className={`p-2.5 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-40 ${
+                  isDark ? "bg-white text-slate-950 hover:bg-slate-200" : "bg-slate-900 text-white hover:bg-slate-800"
+                }`}
+                title="Gönder"
+              >
+                <Send className="w-4 h-4" />
+              </button>
             </form>
           </div>
         </div>
@@ -1313,7 +1581,7 @@ function ApplicationFormScreen({ currentUser, userData, onLogout, theme, toggleT
                   type="checkbox"
                   checked={appForm.termsAccepted}
                   onChange={(e) => setAppForm({ ...appForm, termsAccepted: e.target.checked })}
-                  className="w-4 h-4 mt-0.5 rounded accent-slate-900"
+                  className="w-4 h-4 mt-0.5 rounded accent-slate-900 cursor-pointer"
                 />
                 <span className="text-[11px] leading-relaxed text-slate-400">
                   <Link href="/legal" target="_blank" className={`font-semibold underline ${isDark ? "text-white" : "text-slate-900"}`}>
