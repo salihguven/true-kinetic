@@ -14,16 +14,20 @@ export async function POST(req) {
       );
     }
 
-    // Google Gemini 3.6 Flash Endpoint
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-    const systemInstruction = "Sen True Kinetic Studios oyun ve teknoloji stüdyosunun resmi AI Asistanısın. Ekip üyelerine Roblox Luau scriptleri, Blender 3D modelleme, ses tasarımı ve oyun geliştirme konularında profesyonel, temiz kod örnekli ve Türkçe yardım et.";
+    // SIKI KORUMA VE KOTA TASARRUFU TALİMATI
+    const systemInstruction = `Sen SADECE "True Kinetic Studios" ekibinin dahili oyun geliştirme asistanısın.
+KESİN KURALLAR:
+1. YALNIZCA Roblox Luau scriptleri, Blender 3D modelleme, oyun içi ses/müzik ve stüdyo proje süreçleriyle ilgili sorulara yanıt ver.
+2. Konu dışı (genel donanım tavsiyeleri, günlük sohbet, felsefe, ödev, magazin, oyun geliştirme dışı her şey) sorular sorulduğunda KESİNLİKLE detaylı cevap verme! Sadece şu cümleyi söyle: "Ben yalnızca True Kinetic Studios oyun geliştirme ve stüdyo projeleri konularında destek veren bir asistanım. Lütfen geliştirme veya stüdyo işleriyle ilgili bir soru sorunuz."
+3. Cevaplarını her zaman kısa, öz ve doğrudan amaca yönelik tut. Gereksiz uzun açıklamalardan kaçın.`;
 
     const contents = [];
 
-    // Geçmiş konuşmalar
+    // Geçmiş konuşmalar (Son 4 mesajla sınırlandırdık, kota tasarrufu için)
     if (history && Array.isArray(history)) {
-      history.forEach((h) => {
+      history.slice(-4).forEach((h) => {
         contents.push({
           role: h.role === "user" ? "user" : "model",
           parts: [{ text: h.text }]
@@ -31,7 +35,6 @@ export async function POST(req) {
       });
     }
 
-    // Kullanıcının yeni sorusu
     contents.push({
       role: "user",
       parts: [{ text: `${systemInstruction}\n\nSoru: ${message}` }]
@@ -43,8 +46,8 @@ export async function POST(req) {
       body: JSON.stringify({
         contents: contents,
         generationConfig: {
-          maxOutputTokens: 2048,
-          temperature: 0.7
+          maxOutputTokens: 800, // Kotayı korumak için token limitini düşürdük
+          temperature: 0.3 // Sapmaları önlemek için daha katı yaptık
         }
       })
     });

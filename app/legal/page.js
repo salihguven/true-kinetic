@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { Analytics } from "@vercel/analytics/next"
 import Link from "next/link";
 import {
   ShieldCheck,
