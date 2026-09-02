@@ -16,16 +16,18 @@ export async function POST(req) {
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-    // SIKI KORUMA VE KOTA TASARRUFU TALİMATI
-    const systemInstruction = `Sen SADECE "True Kinetic Studios" ekibinin dahili oyun geliştirme asistanısın.
-KESİN KURALLAR:
-1. YALNIZCA Roblox Luau scriptleri, Blender 3D modelleme, oyun içi ses/müzik ve stüdyo proje süreçleriyle ilgili sorulara yanıt ver.
-2. Konu dışı (genel donanım tavsiyeleri, günlük sohbet, felsefe, ödev, magazin, oyun geliştirme dışı her şey) sorular sorulduğunda KESİNLİKLE detaylı cevap verme! Sadece şu cümleyi söyle: "Ben yalnızca True Kinetic Studios oyun geliştirme ve stüdyo projeleri konularında destek veren bir asistanım. Lütfen geliştirme veya stüdyo işleriyle ilgili bir soru sorunuz."
-3. Cevaplarını her zaman kısa, öz ve doğrudan amaca yönelik tut. Gereksiz uzun açıklamalardan kaçın.`;
+    const systemInstruction = `Sen True Kinetic Studios ekibinin dahili AI asistanısın.
+KRİTİK GÜVENLİK KURALI:
+Eğer kullanıcı mesajında:
+- Hakaret, küfür, aşağılama,
+- Tehdit, şiddet, yasadışı eylemler/yazılımlar,
+- Cinsel, müstehcen, taciz veya ahlak dışı ifadeler içeriyorsa;
+KESİNLİKLE CEVAP VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" yaz ve ardından tek bir cümleyle stüdyo kurallarını ihlal ettiğini, bu eylemin yönetime raporlandığını belirt.
+
+Normal oyun geliştirme (Luau script, 3D modelleme, ses tasarımı, oyun kurgusu) sorularına ise profesyonel ve Türkçe yanıt ver.`;
 
     const contents = [];
 
-    // Geçmiş konuşmalar (Son 4 mesajla sınırlandırdık, kota tasarrufu için)
     if (history && Array.isArray(history)) {
       history.slice(-4).forEach((h) => {
         contents.push({
@@ -37,7 +39,7 @@ KESİN KURALLAR:
 
     contents.push({
       role: "user",
-      parts: [{ text: `${systemInstruction}\n\nSoru: ${message}` }]
+      parts: [{ text: `${systemInstruction}\n\nKullanıcı Mesajı: ${message}` }]
     });
 
     const response = await fetch(endpoint, {
@@ -46,26 +48,44 @@ KESİN KURALLAR:
       body: JSON.stringify({
         contents: contents,
         generationConfig: {
-          maxOutputTokens: 800, // Kotayı korumak için token limitini düşürdük
-          temperature: 0.3 // Sapmaları önlemek için daha katı yaptık
+          maxOutputTokens: 1024,
+          temperature: 0.2
         }
       })
     });
 
     const data = await response.json();
 
+    // HATA VE KOTA AŞIMI KONTROLÜ
     if (!response.ok) {
-      const errorDetail = data.error?.message || "Gemini API isteği reddetti.";
+      // Eğer ücretsiz kota / dakikalık istek sınırı (Rate Limit 429) aşıldıysa:
+      if (
+        response.status === 429 ||
+        data.error?.message?.toLowerCase().includes("quota") ||
+        data.error?.status === "RESOURCE_EXHAUSTED"
+      ) {
+        return NextResponse.json(
+          { error: "⏳ Stüdyo AI Asistanı kısa süreli istek sınırına ulaştı (Rate Limit). Lütfen yaklaşık 20-30 saniye sonra tekrar deneyiniz." },
+          { status: 429 }
+        );
+      }
+
+      const errorDetail = data.error?.message || "Yapay zeka servisi şu anda yanıt veremiyor.";
       return NextResponse.json({ error: errorDetail }, { status: response.status });
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Yanıt alınamadı.";
+    const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Yanıt alınamadı.";
+    const isSecurityAlert = rawReply.includes("[SECURITY_ALERT]");
+    const cleanReply = rawReply.replace("[SECURITY_ALERT]", "").trim();
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      reply: cleanReply,
+      isViolation: isSecurityAlert
+    });
   } catch (error) {
     console.error("Chat route hatası:", error);
     return NextResponse.json(
-      { error: error.message || "Sunucu tarafında beklenmeyen bir hata oluştu." },
+      { error: "Sunucu tarafında beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz." },
       { status: 500 }
     );
   }

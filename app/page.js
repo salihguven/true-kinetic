@@ -226,6 +226,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
   }, [chatMessages]);
 
   // AI SOHBET MESAJI GÖNDERME (GÜNCELLENMİŞ GÜVENLİ FONKSİYON)
+// AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
   const handleSendAiMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || isAiLoading) return;
@@ -249,6 +250,22 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
       const data = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error || `Sunucu Hatası (${res.status})`);
+      }
+
+      // KULLANICI KURAL İHLALİ YAPTIYSA (Hakaret, Tehdit, Cinsellik vb.) ADMIN LOGUNA YAZ
+      if (data.isViolation) {
+        try {
+          await addDoc(collection(db, "security_logs"), {
+            userId: currentUser.uid,
+            userName: currentUser.displayName || "Ekip Üyesi",
+            userEmail: currentUser.email,
+            message: userText,
+            type: "AI_INAPPROPRIATE_CONTENT",
+            createdAt: serverTimestamp()
+          });
+        } catch (logErr) {
+          console.error("Güvenlik logu yazılamadı:", logErr);
+        }
       }
 
       setChatMessages((prev) => [...prev, { role: "model", text: data.reply }]);

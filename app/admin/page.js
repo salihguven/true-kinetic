@@ -44,7 +44,8 @@ import {
   Sliders,
   Sun,
   Moon,
-  FileCheck
+  ShieldAlert,
+  Flame
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -54,12 +55,13 @@ export default function AdminPage() {
   const [userPermissions, setUserPermissions] = useState({});
   const [isCEO, setIsCEO] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [activeTab, setActiveTab] = useState("projects");
+  const [activeTab, setActiveTab] = useState("projects"); // projects, users, security
   const [loading, setLoading] = useState(true);
 
   // Veriler
   const [usersList, setUsersList] = useState([]);
   const [projectsList, setProjectsList] = useState([]);
+  const [securityLogs, setSecurityLogs] = useState([]);
   const [projectFilter, setProjectFilter] = useState("Tümü");
 
   // Özel Rol State'leri
@@ -73,7 +75,6 @@ export default function AdminPage() {
   const [selectedWarnUser, setSelectedWarnUser] = useState(null);
   const [warnMessage, setWarnMessage] = useState("");
 
-  // CEO İZİN DÜZENLEME MODALI
   const [showPermModal, setShowPermModal] = useState(false);
   const [selectedPermUser, setSelectedPermUser] = useState(null);
   const [editPerms, setEditPerms] = useState({
@@ -88,7 +89,6 @@ export default function AdminPage() {
 
   const presetRoles = ["Scripter", "3D Modeler", "Builder", "Composer", "Animator", "UI/UX Designer", "Web Dev"];
 
-  // Tema Senkronizasyonu
   useEffect(() => {
     const savedTheme = localStorage.getItem("tk_theme") || "light";
     setTheme(savedTheme);
@@ -102,7 +102,6 @@ export default function AdminPage() {
 
   const isDark = theme === "dark";
 
-  // SIKI GÜVENLİK VE İZİN KONTROLÜ
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -162,6 +161,13 @@ export default function AdminPage() {
       const pList = [];
       projSnap.forEach((d) => pList.push({ id: d.id, ...d.data() }));
       setProjectsList(pList);
+
+      // Güvenlik İhlal Loglarını Çek
+      const qLogs = query(collection(db, "security_logs"), orderBy("createdAt", "desc"));
+      const logSnap = await getDocs(qLogs);
+      const sList = [];
+      logSnap.forEach((d) => sList.push({ id: d.id, ...d.data() }));
+      setSecurityLogs(sList);
     } catch (err) {
       console.error("Veriler getirilemedi:", err);
     } finally {
@@ -169,7 +175,6 @@ export default function AdminPage() {
     }
   };
 
-  // CEO İzin Düzenleme Modalını Aç
   const openPermissionModal = (user) => {
     setSelectedPermUser(user);
     const p = user.permissions || {};
@@ -185,10 +190,9 @@ export default function AdminPage() {
     setShowPermModal(true);
   };
 
-  // CEO İzinleri Kaydet
   const handleSavePermissions = async () => {
     if (!isCEO) {
-      alert("İzinleri yalnızca CEO (Master Admin) düzenleyebilir.");
+      alert("İzinleri yalnızca CEO düzenleyebilir.");
       return;
     }
     if (!selectedPermUser) return;
@@ -221,7 +225,6 @@ export default function AdminPage() {
     }
   };
 
-  // Başvuru Onayla ve Rol Ata
   const handleApproveWithRole = async (userId, assignedRole) => {
     if (!isCEO && !userPermissions.canApproveUsers) {
       alert("Ekip başvurularını onaylama izniniz bulunmuyor.");
@@ -241,10 +244,9 @@ export default function AdminPage() {
     }
   };
 
-  // Kullanıcı Durumunu Değiştir (Reddet / Yasakla)
   const handleUserStatusChange = async (userId, newStatus) => {
     if (!isCEO && !userPermissions.canModerateUsers) {
-      alert("Kullanıcı yasaklama veya reddetme izniniz yok.");
+      alert("Kullanıcı yasaklama izniniz yok.");
       return;
     }
     try {
@@ -255,7 +257,6 @@ export default function AdminPage() {
     }
   };
 
-  // Kullanıcıya Uyarı Gönder
   const handleSendWarning = async (e) => {
     e.preventDefault();
     if (!isCEO && !userPermissions.canModerateUsers) {
@@ -276,10 +277,9 @@ export default function AdminPage() {
     }
   };
 
-  // Kullanıcı Silme (Sadece CEO)
   const handleDeleteUser = async (userId) => {
     if (!isCEO) {
-      alert("Kullanıcı kaydını silme yetkisi sadece CEO'ya aittir.");
+      alert("Kullanıcı silme yetkisi sadece CEO'ya aittir.");
       return;
     }
     if (!confirm("Bu kullanıcıyı sistemden tamamen silmek istediğinize emin misiniz?")) return;
@@ -291,10 +291,19 @@ export default function AdminPage() {
     }
   };
 
-  // Proje İnceleme Durumu Güncelle (Onay / Red)
+  // Güvenlik Logunu Sil
+  const handleDeleteSecurityLog = async (logId) => {
+    try {
+      await deleteDoc(doc(db, "security_logs", logId));
+      setSecurityLogs(prev => prev.filter(l => l.id !== logId));
+    } catch (err) {
+      alert("Log silinemedi: " + err.message);
+    }
+  };
+
   const handleProjectReview = async (projectId, newReviewStatus) => {
     if (!isCEO && !userPermissions.canReviewProjects) {
-      alert("Proje onaylama veya reddetme izniniz yok.");
+      alert("Proje onaylama izniniz yok.");
       return;
     }
     try {
@@ -307,7 +316,6 @@ export default function AdminPage() {
     }
   };
 
-  // Proje Sil (Sadece CEO)
   const handleDeleteProject = async (projectId) => {
     if (!isCEO) {
       alert("Projeleri silme yetkisi sadece CEO'ya aittir.");
@@ -322,7 +330,6 @@ export default function AdminPage() {
     }
   };
 
-  // Duyuru Yayınla
   const handlePublishAnnounce = async (e) => {
     e.preventDefault();
     if (!isCEO && !userPermissions.canPostAnnouncements) {
@@ -354,7 +361,6 @@ export default function AdminPage() {
     );
   }
 
-  // YETKİSİZ KULLANICI ENGEL EKRANI
   if (!isAuthorized) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-6 font-sans transition-colors ${
@@ -461,12 +467,12 @@ export default function AdminPage() {
         </div>
 
         {/* TAB SEÇİCİ */}
-        <div className={`flex items-center gap-2 border-b pb-3 ${
+        <div className={`flex items-center gap-2 border-b pb-3 overflow-x-auto ${
           isDark ? "border-[#1a1d26]" : "border-slate-200"
         }`}>
           <button
             onClick={() => setActiveTab("projects")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
               activeTab === "projects"
                 ? (isDark ? "bg-white text-slate-950 shadow-xs" : "bg-slate-900 text-white shadow-xs")
                 : (isDark ? "text-slate-400 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100")
@@ -474,18 +480,36 @@ export default function AdminPage() {
           >
             <FolderGit2 className="w-4 h-4" /> İş & Proje İnceleme ({projectsList.length})
           </button>
+          
           <button
             onClick={() => setActiveTab("users")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
               activeTab === "users"
                 ? (isDark ? "bg-white text-slate-950 shadow-xs" : "bg-slate-900 text-white shadow-xs")
                 : (isDark ? "text-slate-400 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100")
             }`}
           >
-            <Users className="w-4 h-4" /> Ekip Başvuruları & Yetki Masası ({usersList.length})
+            <Users className="w-4 h-4" /> Ekip Başvuruları & Yetkiler ({usersList.length})
             {pendingUsers.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
                 {pendingUsers.length}
+              </span>
+            )}
+          </button>
+
+          {/* 3. GÜVENLİK VE İHLAL LOGLARI TABI */}
+          <button
+            onClick={() => setActiveTab("security")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
+              activeTab === "security"
+                ? "bg-rose-600 text-white shadow-xs"
+                : (isDark ? "text-rose-400 hover:bg-rose-950/30" : "text-rose-600 hover:bg-rose-50")
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" /> Güvenlik & AI İhlal Logları ({securityLogs.length})
+            {securityLogs.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-white text-rose-600 text-[10px] font-bold">
+                {securityLogs.length}
               </span>
             )}
           </button>
@@ -637,7 +661,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 2: EKİP BAŞVURULARI & CEO İZİN MASASI */}
+        {/* TAB 2: EKİP BAŞVURULARI & YETKİ MASASI */}
         {activeTab === "users" && (
           <div className="space-y-6">
             {/* BAŞVURU DOSYALARI */}
@@ -751,7 +775,7 @@ export default function AdminPage() {
                             <div className="flex items-center gap-2 flex-1">
                               <input
                                 type="text"
-                                placeholder="Özel rol yazın (Örn: Lead Composer, Seslendirmen...)"
+                                placeholder="Özel rol yazın..."
                                 value={customRoleVal}
                                 onChange={(e) => setCustomRoles({ ...customRoles, [user.id]: e.target.value })}
                                 className={`px-3 py-1.5 rounded-lg border text-xs focus:outline-none flex-1 ${
@@ -796,7 +820,7 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* AKTİF ÜYELER & CEO İZİN MASASI */}
+            {/* AKTİF ÜYELER & İZİN MASASI */}
             <div>
               <h2 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${
                 isDark ? "text-slate-300" : "text-slate-700"
@@ -825,7 +849,6 @@ export default function AdminPage() {
                             {user.role || "Developer"}
                           </span>
                           
-                          {/* UNVAN ROZETİ */}
                           <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-bold flex items-center gap-1 ${
                             isDark ? "bg-indigo-950/40 text-indigo-400 border-indigo-800/60" : "bg-indigo-50 text-indigo-700 border-indigo-200"
                           }`}>
@@ -849,7 +872,6 @@ export default function AdminPage() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
-                        {/* CEO İÇİN ÖZEL İZİN BUTONU */}
                         {isCEO && (
                           <button
                             onClick={() => openPermissionModal(user)}
@@ -963,7 +985,99 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* CEO İZİN VE RÜTBE DÜZENLEME MODALI (SİYAH ÇUBUKSUZ) */}
+        {/* ========================================================= */}
+        {/* TAB 3: GÜVENLİK & AI İHLAL LOGLARI MASASI                 */}
+        {/* ========================================================= */}
+        {activeTab === "security" && (
+          <div className="space-y-4">
+            <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+              isDark ? "bg-rose-950/20 border-rose-900/40 text-rose-300" : "bg-rose-50 border-rose-200 text-rose-800"
+            }`}>
+              <ShieldAlert className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+              <div className="text-xs leading-relaxed">
+                <b>Otomatik Güvenlik Denetimi:</b> Stüdyo yapay zekasına hakaret, tehdit, küfür, cinsel veya yasadışı ifadeler yazan kullanıcılar anında tespit edilir ve buraya loglanır.
+              </div>
+            </div>
+
+            {securityLogs.length === 0 ? (
+              <div className={`p-14 rounded-3xl border text-center shadow-xs ${
+                isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200"
+              }`}>
+                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2.5 opacity-80" />
+                <h3 className="text-sm font-bold">Harika! Hiçbir Güvenlik İhlali Yok</h3>
+                <p className="text-xs text-slate-400 mt-1">Stüdyo ekibi yapay zekayı kurallara uygun kullanıyor.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {securityLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`p-5 rounded-2xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+                      isDark ? "bg-[#0d0f14] border-rose-900/50" : "bg-white border-rose-200"
+                    }`}
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-rose-500 flex items-center gap-1">
+                          <Flame className="w-4 h-4" /> {log.userName}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">({log.userEmail})</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/10 text-rose-500 font-mono font-bold">
+                          KURAL İHLALİ
+                        </span>
+                      </div>
+
+                      {/* Yazılan İhlal Mesajı */}
+                      <div className={`p-3 rounded-xl border text-xs font-mono break-all ${
+                        isDark ? "bg-[#07080b] border-[#1a1d26] text-rose-300" : "bg-rose-50/50 border-rose-100 text-rose-900 font-medium"
+                      }`}>
+                        💬 "{log.message}"
+                      </div>
+                    </div>
+
+                    {/* Hızlı Aksiyon Butonları (Uyarı Ver / Banla / Logu Sil) */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          const targetUser = usersList.find(u => u.id === log.userId) || { id: log.userId, displayName: log.userName };
+                          setSelectedWarnUser(targetUser);
+                          setWarnMessage("Stüdyo yapay zekasında uygunsuz/kural dışı dil kullanımı tespit edildi. Lütfen kurallara uyunuz.");
+                          setShowWarnModal(true);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 ${
+                          isDark ? "bg-amber-950/40 text-amber-400 border-amber-800 hover:bg-amber-900/60" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                        }`}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" /> Uyarı Ver
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (confirm(`${log.userName} adlı kullanıcıyı bu ihlal sebebiyle stüdyodan yasaklamak istiyor musunuz?`)) {
+                            handleUserStatusChange(log.userId, "banned");
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1 transition-all active:scale-95"
+                      >
+                        <ShieldBan className="w-3.5 h-3.5" /> Yasakla
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteSecurityLog(log.id)}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors"
+                        title="Logu Temizle"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CEO İZİN MODALI */}
         {showPermModal && selectedPermUser && (
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div className={`border rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden transition-all ${
@@ -1034,7 +1148,7 @@ export default function AdminPage() {
                   }`}>
                     <div>
                       <div className="font-semibold">🚀 Tüm Stüdyo Projelerini Görme</div>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Hub ekranında tüm stüdyonun projelerini canlı izleyebilir (Group Leader yetkisi).</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Hub ekranında tüm stüdyonun projelerini canlı izleyebilir.</p>
                     </div>
                     <input
                       type="checkbox"
@@ -1117,7 +1231,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* UYARI GÖNDERME MODALI */}
+        {/* UYARI MODALI */}
         {showWarnModal && selectedWarnUser && (
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div className={`border rounded-3xl max-w-md w-full shadow-2xl overflow-hidden transition-all ${
@@ -1141,7 +1255,7 @@ export default function AdminPage() {
                   <textarea
                     rows="3"
                     required
-                    placeholder="Örn: Proje teslim tarihlerine dikkat ediniz..."
+                    placeholder="Örn: Stüdyo yapay zekasında uygunsuz dil kullanımı tespit edildi..."
                     value={warnMessage}
                     onChange={(e) => setWarnMessage(e.target.value)}
                     className={`w-full px-3.5 py-2.5 rounded-xl border resize-none focus:outline-none ${
