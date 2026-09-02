@@ -1,4 +1,5 @@
 import { Inter, Space_Grotesk } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 const inter = Inter({
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
         className={`${inter.variable} ${spaceGrotesk.variable} font-sans bg-dark text-white antialiased selection:bg-accent-cyan selection:text-black`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );
