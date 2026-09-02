@@ -71,11 +71,10 @@ import {
   Check
 } from "lucide-react";
 
-// DİSCORD GÖREV BİLDİRİM WEBHOOK'U
 const DISCORD_TASK_WEBHOOK = "https://discord.com/api/webhooks/1542226540799197275/hTeTL90ikfLAXdlUg2bfZmDAD3yxUuqJRQhvHK4bhcDFp4ADlTiQh_RjRjQ3fzRrzBQ9";
 
 // =========================================================
-// ÖZEL KOD BLOKU VE KOPYALAMA BİLEŞENİ (AI FORMATTER)
+// ÖZEL KOD BLOKU VE KOPYALAMA BİLEŞENİ
 // =========================================================
 function FormattedAiMessage({ content, isDark }) {
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -86,8 +85,8 @@ function FormattedAiMessage({ content, isDark }) {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // Metni kod blokları (```) ve normal paragraflar olarak ayır
-  const parts = content.split(/(```[\s\S]*?```)/g);
+  const safeContent = typeof content === "string" ? content : String(content || "");
+  const parts = safeContent.split(/(```[\s\S]*?```)/g);
 
   return (
     <div className="space-y-2.5 leading-relaxed text-xs">
@@ -109,7 +108,6 @@ function FormattedAiMessage({ content, isDark }) {
                 isDark ? "bg-[#090b10] border-[#1e2330]" : "bg-slate-900 border-slate-800 text-slate-100"
               }`}
             >
-              {/* Kod Kutusu Başlığı & Kopyala Butonu */}
               <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-white/5 text-[11px] font-mono text-slate-400">
                 <span className="uppercase text-[10px] font-bold text-indigo-400">{language}</span>
                 <button
@@ -132,7 +130,6 @@ function FormattedAiMessage({ content, isDark }) {
                 </button>
               </div>
 
-              {/* Kod Gövdesi */}
               <pre className="p-3.5 overflow-x-auto text-[11px] font-mono text-emerald-300 whitespace-pre leading-relaxed selection:bg-indigo-500 selection:text-white">
                 <code>{code}</code>
               </pre>
@@ -225,7 +222,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     { name: "Kritik", color: isDark ? "bg-rose-950/40 border-rose-800/50 text-rose-300" : "bg-rose-50 border-rose-200 text-rose-700" }
   ];
 
-  // CEO VE YETKİ KONTROLÜ
   const isMasterCEO = ADMIN_EMAILS.includes(currentUser?.email?.toLowerCase());
   const permissions = isMasterCEO ? {
     canAccessAdmin: true,
@@ -331,7 +327,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         throw new Error(data.error || `Sunucu Hatası (${res.status})`);
       }
 
-      // KURAL İHLALİ ALGILANDIYSA ARKA PLANDA ADMIN LOGUNA YAZ
       if (data.isViolation) {
         try {
           await addDoc(collection(db, "security_logs"), {
@@ -347,11 +342,11 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         }
       }
 
-      setChatMessages((prev) => [...prev, { role: "model", text: data.reply }]);
+      setChatMessages((prev) => [...prev, { role: "model", text: data.reply || "Yanıt alınamadı." }]);
     } catch (err) {
       setChatMessages((prev) => [
         ...prev,
-        { role: "model", text: `⚠️ ${err.message}` }
+        { role: "model", text: `⚠️ ${err.message || "Bir hata oluştu."}` }
       ]);
     } finally {
       setIsAiLoading(false);
@@ -401,7 +396,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     }
   };
 
-  // GÖREV ATAMA & DISCORD WEBHOOK GÖNDERME
+  // GÖREV ATAMA & DISCORD WEBHOOK
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!canAssignTasks) {
@@ -501,9 +496,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     <div className={`min-h-screen flex font-sans transition-colors duration-200 overflow-x-hidden ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
     }`}>
-      {/* ========================================================= */}
-      {/* SOL DİKEY SIDEBAR                                         */}
-      {/* ========================================================= */}
+      {/* SOL DİKEY SIDEBAR */}
       <aside className={`w-64 border-r shrink-0 flex flex-col justify-between p-5 transition-all duration-200 md:flex sticky top-0 h-screen ${
         isMobileMenuOpen ? "fixed inset-y-0 left-0 z-50 shadow-2xl flex" : "hidden md:flex"
       } ${
@@ -592,7 +585,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               <span className="text-[10px] font-mono opacity-80">{displayedTasks.length}</span>
             </button>
 
-            {/* AI ASİSTANI BUTONU */}
             <button
               onClick={() => { setShowAiChat(true); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition-all border ${
@@ -653,9 +645,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       </aside>
 
-      {/* ========================================================= */}
-      {/* SAĞ İÇERİK ALANI                                          */}
-      {/* ========================================================= */}
+      {/* SAĞ İÇERİK ALANI */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className={`md:hidden flex items-center justify-between p-4 border-b ${
           isDark ? "border-[#1a1d26] bg-[#0d0f14]" : "border-slate-200 bg-white"
@@ -678,7 +668,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
 
         <main className="flex-1 p-6 md:p-8 max-w-6xl w-full mx-auto space-y-6">
-          {/* KARŞILAMA VE HOŞ GELDİN KARTI */}
+          {/* KARŞILAMA KARTI */}
           <div className={`p-6 sm:p-7 rounded-3xl border relative overflow-hidden transition-all shadow-xs ${
             isDark
               ? "bg-gradient-to-br from-[#0d0f14] via-[#090b0f] to-[#07080b] border-[#1a1d26]"
@@ -722,7 +712,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
             </div>
           </div>
 
-          {/* GİZLENEBİLİR YÖNETİM UYARISI */}
+          {/* GİZLENEBİLİR UYARI */}
           {hasValidWarning && !isWarningDismissed && (
             <div className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-3.5 shadow-sm ${
               isDark
@@ -1385,9 +1375,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 1.6 STÜDYO YAPAY ZEKA SOHBET MODALI (KOD FORMATLI)        */}
-      {/* ========================================================= */}
+      {/* AI ASİSTANI SOHBET MODALI */}
       {showAiChat && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-2xl w-full h-[640px] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden transition-all ${
@@ -1438,7 +1426,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                         : (isDark ? "bg-[#07080b] border border-[#1a1d26] text-slate-200" : "bg-slate-50 border border-slate-200 text-slate-800")
                     }`}
                   >
-                    {/* FORMATLANMIŞ KOD VE METİN ÇIKTISI */}
                     {msg.role === "model" ? (
                       <FormattedAiMessage content={msg.text} isDark={isDark} />
                     ) : (
@@ -2070,7 +2057,7 @@ export default function HubAuthPage() {
     );
   }
 
-  // 4. GİRİŞ & KAYIT FORMU
+  // 4. GİRİŞ & KAYIT EKRANI
   return (
     <div className={`min-h-screen flex items-center justify-center p-6 font-sans transition-colors duration-200 ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
