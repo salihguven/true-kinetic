@@ -14,33 +14,46 @@ export async function POST(req) {
       );
     }
 
-    // 1. KATMAN: YASADIŞI, KUMAR, KÜFÜR VE İHLAL FİLTRESİ
-    const lowerMsg = (message || "").toLowerCase();
-    const illegalAndBadWords = [
-      "kumar", "bahis", "casino", "slot", "rulet", "blackjack", "bet", "kaçak",
+    const lowerMsg = (message || "").toLowerCase().trim();
+
+    // 1. ZARARSIZ SELAMLAŞMALAR
+    const greetings = ["selam", "slm", "merhaba", "mrb", "sa", "s.a", "selamün aleyküm", "selamun aleykum", "günaydın", "iyi günler", "kolay gelsin", "naber", "nbr", "hey", "nasılsın"];
+    if (greetings.includes(lowerMsg)) {
+      return NextResponse.json({
+        reply: "Merhaba! True Kinetic Studios projeleri, Roblox Luau kodlama, 3D modelleme veya ses tasarımı hakkında nasıl yardımcı olabilirim?",
+        isViolation: false
+      });
+    }
+
+    // 2. SADECE AĞIR İHLAL KELİMELERİ (KÜFÜR, TEHDİT, CİNSELLİK, KUMAR, LEAK)
+    const criticalViolations = [
+      "kumar", "bahis", "casino", "slot", "rulet", "blackjack", "bet",
       "amk", "aq", "orospu", "piç", "sik", "yarrak", "sikeyim", "göt", "kahpe", "pezevenk",
       "ananı", "bacını", "tehdit", "öldür", "patlat", "hackle", "ddos", "rat", "trojan",
       "porno", "sex", "sikiş", "meme", "amcık", "sürtük", "ibne", "gavat", "leak", "sızdır", "crack"
     ];
 
-    const hasDirectViolation = illegalAndBadWords.some((w) => lowerMsg.includes(w));
+    const hasCriticalViolation = criticalViolations.some((w) => {
+      const regex = new RegExp(`\\b${w}\\b`, "i");
+      return regex.test(lowerMsg) || (w.length > 3 && lowerMsg.includes(w));
+    });
 
-    // Eğer doğrudan kumar/küfür/yasadışı içerik varsa Gemini'ye gitmeden ANINDA İHLAL SAY VE ENGELLE:
-    if (hasDirectViolation) {
+    if (hasCriticalViolation) {
       return NextResponse.json({
-        reply: "⚠️ Bu mesaj stüdyo kurallarına (yasadışı içerik, kumar, hakaret veya uygunsuzluk) aykırıdır. Mesajınız engellendi ve stüdyo yönetimine raporlandı.",
+        reply: "⚠️ Bu mesaj stüdyo kurallarını (ağır hakaret, tehdit, kumar veya uygunsuz içerik) ihlal ettiği için engellenmiş ve stüdyo yönetimine raporlanmıştır.",
         isViolation: true
       });
     }
 
-    // 2. KATMAN: GOOGLE GEMINI RESMİ ENDPOINT VE SYSTEM INSTRUCTION
+    // 3. GEMINI API ENTEGRASYONU
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-    const systemPrompt = `Sen SADECE "True Kinetic Studios" oyun ve teknoloji geliştirme ekibinin dahili asistanısın.
-KESİN TALİMATLAR:
-1. YALNIZCA Roblox Luau scriptleri, Blender 3D modelleme, oyun tasarımı, ses/SFX ve stüdyo projelerine yanıt ver.
-2. Kumar, bahis, yasadışı yazılımlar, genel donanım tavsiyeleri, günlük muhabbet, küfür, hakaret ve konu dışı HER ŞEYİ KESİNLİKLE REDDET!
-3. Eğer konu dışı veya kural dışı bir şey sorulursa YALNIZCA şunu söyle: "[SECURITY_ALERT] Bu talep stüdyo kurallarına aykırıdır ve geliştirme süreçlerimizle ilgili değildir."`;
+    const systemPrompt = `Sen "True Kinetic Studios" ekibinin dahili geliştirici yapay zekasısın.
+KURALLAR:
+1. Ekip üyelerine Roblox Luau scriptleri, Blender 3D modelleme, SFX ses tasarımı ve stüdyo işlerinde profesyonel, eksiksiz kod bloklarıyla ve Türkçe yardım et.
+2. Kod yazarken kod bloklarını KESİNLİKLE yarım bırakma, pcall, datastore veya fonksiyonların tamamını eksiksiz yaz.
+3. Düşünce adımlarını veya taslak notlarını çıktıya ekleme, doğrudan çalışan temiz kodu ve ardından kısa özet açıklamayı ver.
+4. SADECE ağır hakaret, tehdit, cinsel içerik veya yasadışı talepler geldiğinde yanıtının başına "[CRITICAL_VIOLATION]" yaz ve reddet.`;
 
     const contents = [];
 
@@ -67,8 +80,8 @@ KESİN TALİMATLAR:
         },
         contents: contents,
         generationConfig: {
-          maxOutputTokens: 800,
-          temperature: 0.1
+          maxOutputTokens: 4096, // Kodların yarım kalmaması için 4096 yaptık
+          temperature: 0.5
         }
       })
     });
@@ -89,36 +102,34 @@ KESİN TALİMATLAR:
 
       if (data.error?.message?.toLowerCase().includes("safety")) {
         return NextResponse.json({
-          reply: "⚠️ Bu mesaj güvenlik kurallarını ihlal ettiği için engellenmiş ve stüdyo yönetimine raporlanmıştır.",
+          reply: "⚠️ Bu mesaj güvenlik filtreleri tarafından engellenmiş ve stüdyo yönetimine bildirilmiştir.",
           isViolation: true
         });
       }
 
-      const errorDetail = data.error?.message || "Yapay zeka servisi şu anda yanıt veremiyor.";
-      return NextResponse.json({ error: errorDetail }, { status: response.status });
+      return NextResponse.json({ error: data.error?.message || "Yapay zeka yanıt veremedi." }, { status: response.status });
     }
 
     const candidate = data.candidates?.[0];
-    const isGoogleSafetyBlock = candidate?.finishReason === "SAFETY" || data.promptFeedback?.blockReason === "SAFETY";
-
+    const isGoogleSafetyBlock = candidate?.finishReason === "SAFETY";
     const rawReply = candidate?.content?.parts?.[0]?.text || "";
-    const isPromptAlert = rawReply.includes("[SECURITY_ALERT]");
+    const isCriticalViolation = rawReply.includes("[CRITICAL_VIOLATION]");
 
-    const isViolation = isGoogleSafetyBlock || isPromptAlert;
-    let cleanReply = rawReply.replace("[SECURITY_ALERT]", "").trim();
+    const isViolation = isGoogleSafetyBlock || isCriticalViolation;
+    let cleanReply = rawReply.replace("[CRITICAL_VIOLATION]", "").trim();
 
     if (isViolation && !cleanReply) {
-      cleanReply = "⚠️ Bu talep stüdyo kurallarına (yasadışı/uygunsuz/konu dışı) aykırı olduğu için engellenmiş ve yönetime bildirilmiştir.";
+      cleanReply = "⚠️ Bu mesaj kural ihlali sebebiyle engellendi ve yönetime raporlandı.";
     }
 
     return NextResponse.json({
-      reply: cleanReply || "Yanıt oluşturulamadı.",
+      reply: cleanReply || "Yanıt alınamadı.",
       isViolation: isViolation
     });
   } catch (error) {
     console.error("Chat route hatası:", error);
     return NextResponse.json(
-      { error: "Sunucu tarafında beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz." },
+      { error: "Sunucu tarafında beklenmeyen bir hata oluştu." },
       { status: 500 }
     );
   }
