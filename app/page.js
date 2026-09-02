@@ -66,10 +66,91 @@ import {
   EyeOff,
   Bot,
   Send,
-  Loader2
+  Loader2,
+  Copy,
+  Check
 } from "lucide-react";
 
 const DISCORD_TASK_WEBHOOK = "https://discord.com/api/webhooks/1542226540799197275/hTeTL90ikfLAXdlUg2bfZmDAD3yxUuqJRQhvHK4bhcDFp4ADlTiQh_RjRjQ3fzRrzBQ9";
+
+// =========================================================
+// ÖZEL KOD BLOKU & MARKDOWN PARSER BİLEŞENİ
+// =========================================================
+function FormattedAiMessage({ content, isDark }) {
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  const copyToClipboard = (text, index) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  // Metni kod blokları (```) ve normal yazılar olarak ayır
+  const parts = content.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-2.5 leading-relaxed text-xs">
+      {parts.map((part, index) => {
+        if (part.startsWith("```") && part.endsWith("```")) {
+          // Kod bloğu içeriğini al
+          const lines = part.slice(3, -3).trim().split("\n");
+          let language = "code";
+          let code = part.slice(3, -3).trim();
+
+          // Eğer ilk satırda dil adı varsa (örn: lua, js, python)
+          if (lines.length > 1 && /^[a-zA-Z0-9_-]+$/.test(lines[0].trim())) {
+            language = lines[0].trim();
+            code = lines.slice(1).join("\n");
+          }
+
+          return (
+            <div
+              key={index}
+              className={`rounded-xl border overflow-hidden my-2 shadow-xs ${
+                isDark ? "bg-[#090b10] border-[#1e2330]" : "bg-slate-900 border-slate-800 text-slate-100"
+              }`}
+            >
+              {/* Kod Kutusu Üst Başlığı (Dil ve Kopyala Butonu) */}
+              <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-white/5 text-[11px] font-mono text-slate-400">
+                <span className="uppercase text-[10px] font-bold text-indigo-400">{language}</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(code, index)}
+                  className="flex items-center gap-1 hover:text-white transition-colors py-0.5 px-1.5 rounded bg-white/5 hover:bg-white/10"
+                  title="Kodu Kopyala"
+                >
+                  {copiedIndex === index ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span className="text-[10px] text-emerald-400">Kopyalandı!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span className="text-[10px]">Kopyala</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Kod İçeriği */}
+              <pre className="p-3.5 overflow-x-auto text-[11px] font-mono text-emerald-300 whitespace-pre leading-relaxed selection:bg-indigo-500 selection:text-white">
+                <code>{code}</code>
+              </pre>
+            </div>
+          );
+        }
+
+        // Normal Metin (Kalın yazıları vb. formatla)
+        return (
+          <div key={index} className="whitespace-pre-wrap">
+            {part}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // =========================================================
 // 1. HUB DASHBOARD (AI SOHBET ASİSTANLI)
@@ -225,9 +306,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // AI SOHBET MESAJI GÖNDERME (GÜNCELLENMİŞ GÜVENLİ FONKSİYON)
-// AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
-// AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
+  // AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
   const handleSendAiMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || isAiLoading) return;
@@ -253,7 +332,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         throw new Error(data.error || `Sunucu Hatası (${res.status})`);
       }
 
-      // İHLAL VARSA FIRESTORE'A HEMEN KAYDET
       if (data.isViolation) {
         try {
           await addDoc(collection(db, "security_logs"), {
@@ -264,7 +342,6 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
             type: "AI_INAPPROPRIATE_CONTENT",
             createdAt: serverTimestamp()
           });
-          console.log("🚨 Güvenlik İhlal Logu Başarıyla Kaydedildi!");
         } catch (logErr) {
           console.error("Güvenlik logu yazılamadı:", logErr);
         }
@@ -1160,7 +1237,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       )}
 
-      {/* GÖREV ATAMA MODALI (DISCORD ENTEGRELİ) */}
+      {/* GÖREV ATAMA MODALI */}
       {showTaskModal && canAssignTasks && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`border rounded-3xl max-w-md w-full shadow-2xl overflow-hidden transition-all ${
@@ -1303,10 +1380,12 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       )}
 
-      {/* AI ASİSTANI SOHBET MODALI */}
+      {/* ========================================================= */}
+      {/* 1.6 STÜDYO YAPAY ZEKA SOHBET MODALI (KOD FORMATLI)        */}
+      {/* ========================================================= */}
       {showAiChat && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className={`border rounded-3xl max-w-xl w-full h-[600px] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden transition-all ${
+          <div className={`border rounded-3xl max-w-2xl w-full h-[640px] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden transition-all ${
             isDark ? "bg-[#0d0f14] border-[#1a1d26] text-white" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${
@@ -1334,6 +1413,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </button>
             </div>
 
+            {/* Sohbet Mesajları Alanı */}
             <div className="flex-1 p-6 overflow-y-auto space-y-4 text-xs [scrollbar-width:thin]">
               {chatMessages.map((msg, index) => (
                 <div
@@ -1347,13 +1427,18 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
                   )}
 
                   <div
-                    className={`p-3.5 rounded-2xl max-w-[80%] leading-relaxed whitespace-pre-wrap ${
+                    className={`p-4 rounded-2xl max-w-[85%] leading-relaxed ${
                       msg.role === "user"
-                        ? (isDark ? "bg-white text-slate-950 font-medium" : "bg-slate-900 text-white font-medium")
+                        ? (isDark ? "bg-white text-slate-950 font-medium whitespace-pre-wrap" : "bg-slate-900 text-white font-medium whitespace-pre-wrap")
                         : (isDark ? "bg-[#07080b] border border-[#1a1d26] text-slate-200" : "bg-slate-50 border border-slate-200 text-slate-800")
                     }`}
                   >
-                    {msg.text}
+                    {/* FORMATLANMIŞ KOD VE METİN ÇIKTISI */}
+                    {msg.role === "model" ? (
+                      <FormattedAiMessage content={msg.text} isDark={isDark} />
+                    ) : (
+                      msg.text
+                    )}
                   </div>
                 </div>
               ))}
@@ -1361,7 +1446,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               {isAiLoading && (
                 <div className="flex items-center gap-2 text-slate-400 text-xs italic">
                   <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                  <span>Stüdyo asistanı düşünüyor ve yanıt hazırlıyor...</span>
+                  <span>Stüdyo asistanı düşünüyor ve kodları hazırlıyor...</span>
                 </div>
               )}
               <div ref={chatEndRef} />
@@ -1600,7 +1685,7 @@ function ApplicationFormScreen({ currentUser, userData, onLogout, theme, toggleT
                   type="checkbox"
                   checked={appForm.termsAccepted}
                   onChange={(e) => setAppForm({ ...appForm, termsAccepted: e.target.checked })}
-                  className="w-4 h-4 mt-0.5 rounded accent-slate-900 cursor-pointer"
+                  className="w-4 h-4 mt-0.5 rounded accent-slate-900"
                 />
                 <span className="text-[11px] leading-relaxed text-slate-400">
                   <Link href="/legal" target="_blank" className={`font-semibold underline ${isDark ? "text-white" : "text-slate-900"}`}>
@@ -1746,7 +1831,7 @@ function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh, th
 
         <div className="text-center mt-4">
           <Link href="/legal" className="text-xs text-slate-400 hover:text-slate-200 underline font-mono">
-            Yasal Sözleşmeler & Stüdyo Kuralları
+            Yasal Sözleşmeler & Kurallar
           </Link>
         </div>
       </div>
