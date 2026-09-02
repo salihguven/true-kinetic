@@ -71,10 +71,11 @@ import {
   Check
 } from "lucide-react";
 
+// DİSCORD GÖREV BİLDİRİM WEBHOOK'U
 const DISCORD_TASK_WEBHOOK = "https://discord.com/api/webhooks/1542226540799197275/hTeTL90ikfLAXdlUg2bfZmDAD3yxUuqJRQhvHK4bhcDFp4ADlTiQh_RjRjQ3fzRrzBQ9";
 
 // =========================================================
-// ÖZEL KOD BLOKU & MARKDOWN PARSER BİLEŞENİ
+// ÖZEL KOD BLOKU VE KOPYALAMA BİLEŞENİ (AI FORMATTER)
 // =========================================================
 function FormattedAiMessage({ content, isDark }) {
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -85,19 +86,17 @@ function FormattedAiMessage({ content, isDark }) {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // Metni kod blokları (```) ve normal yazılar olarak ayır
+  // Metni kod blokları (```) ve normal paragraflar olarak ayır
   const parts = content.split(/(```[\s\S]*?```)/g);
 
   return (
     <div className="space-y-2.5 leading-relaxed text-xs">
       {parts.map((part, index) => {
         if (part.startsWith("```") && part.endsWith("```")) {
-          // Kod bloğu içeriğini al
           const lines = part.slice(3, -3).trim().split("\n");
-          let language = "code";
+          let language = "luau";
           let code = part.slice(3, -3).trim();
 
-          // Eğer ilk satırda dil adı varsa (örn: lua, js, python)
           if (lines.length > 1 && /^[a-zA-Z0-9_-]+$/.test(lines[0].trim())) {
             language = lines[0].trim();
             code = lines.slice(1).join("\n");
@@ -106,17 +105,17 @@ function FormattedAiMessage({ content, isDark }) {
           return (
             <div
               key={index}
-              className={`rounded-xl border overflow-hidden my-2 shadow-xs ${
+              className={`rounded-xl border overflow-hidden my-2.5 shadow-xs ${
                 isDark ? "bg-[#090b10] border-[#1e2330]" : "bg-slate-900 border-slate-800 text-slate-100"
               }`}
             >
-              {/* Kod Kutusu Üst Başlığı (Dil ve Kopyala Butonu) */}
+              {/* Kod Kutusu Başlığı & Kopyala Butonu */}
               <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-white/5 text-[11px] font-mono text-slate-400">
                 <span className="uppercase text-[10px] font-bold text-indigo-400">{language}</span>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(code, index)}
-                  className="flex items-center gap-1 hover:text-white transition-colors py-0.5 px-1.5 rounded bg-white/5 hover:bg-white/10"
+                  className="flex items-center gap-1 hover:text-white transition-colors py-0.5 px-2 rounded bg-white/5 hover:bg-white/10"
                   title="Kodu Kopyala"
                 >
                   {copiedIndex === index ? (
@@ -133,7 +132,7 @@ function FormattedAiMessage({ content, isDark }) {
                 </button>
               </div>
 
-              {/* Kod İçeriği */}
+              {/* Kod Gövdesi */}
               <pre className="p-3.5 overflow-x-auto text-[11px] font-mono text-emerald-300 whitespace-pre leading-relaxed selection:bg-indigo-500 selection:text-white">
                 <code>{code}</code>
               </pre>
@@ -141,7 +140,6 @@ function FormattedAiMessage({ content, isDark }) {
           );
         }
 
-        // Normal Metin (Kalın yazıları vb. formatla)
         return (
           <div key={index} className="whitespace-pre-wrap">
             {part}
@@ -153,7 +151,7 @@ function FormattedAiMessage({ content, isDark }) {
 }
 
 // =========================================================
-// 1. HUB DASHBOARD (AI SOHBET ASİSTANLI)
+// 1. HUB DASHBOARD (ÇALIŞMA ALANI & YÖNETİM)
 // =========================================================
 function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -174,7 +172,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
   const [commitAccepted, setCommitAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // AI CHAT STATE'LERİ
+  // AI Chat State'leri
   const [showAiChat, setShowAiChat] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState([
@@ -227,6 +225,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     { name: "Kritik", color: isDark ? "bg-rose-950/40 border-rose-800/50 text-rose-300" : "bg-rose-50 border-rose-200 text-rose-700" }
   ];
 
+  // CEO VE YETKİ KONTROLÜ
   const isMasterCEO = ADMIN_EMAILS.includes(currentUser?.email?.toLowerCase());
   const permissions = isMasterCEO ? {
     canAccessAdmin: true,
@@ -259,6 +258,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     isPrivate: false
   });
 
+  // Canlı Firestore Dinleyicileri
   useEffect(() => {
     const qProjects = query(collection(db, "projects"), orderBy("createdAt", "desc"));
     const unsubProjects = onSnapshot(qProjects, (snap) => {
@@ -301,12 +301,11 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     };
   }, []);
 
-  // AI Mesaj Scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
+  // AI SOHBET MESAJI GÖNDERME & İHLAL LOGLAMA
   const handleSendAiMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || isAiLoading) return;
@@ -332,6 +331,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         throw new Error(data.error || `Sunucu Hatası (${res.status})`);
       }
 
+      // KURAL İHLALİ ALGILANDIYSA ARKA PLANDA ADMIN LOGUNA YAZ
       if (data.isViolation) {
         try {
           await addDoc(collection(db, "security_logs"), {
@@ -401,6 +401,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     }
   };
 
+  // GÖREV ATAMA & DISCORD WEBHOOK GÖNDERME
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!canAssignTasks) {
@@ -500,7 +501,9 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
     <div className={`min-h-screen flex font-sans transition-colors duration-200 overflow-x-hidden ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
     }`}>
-      {/* SOL DİKEY SIDEBAR */}
+      {/* ========================================================= */}
+      {/* SOL DİKEY SIDEBAR                                         */}
+      {/* ========================================================= */}
       <aside className={`w-64 border-r shrink-0 flex flex-col justify-between p-5 transition-all duration-200 md:flex sticky top-0 h-screen ${
         isMobileMenuOpen ? "fixed inset-y-0 left-0 z-50 shadow-2xl flex" : "hidden md:flex"
       } ${
@@ -589,7 +592,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               <span className="text-[10px] font-mono opacity-80">{displayedTasks.length}</span>
             </button>
 
-            {/* AI ASİSTANI MENÜ BUTONU */}
+            {/* AI ASİSTANI BUTONU */}
             <button
               onClick={() => { setShowAiChat(true); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition-all border ${
@@ -650,7 +653,9 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
         </div>
       </aside>
 
-      {/* SAĞ İÇERİK ALANI */}
+      {/* ========================================================= */}
+      {/* SAĞ İÇERİK ALANI                                          */}
+      {/* ========================================================= */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className={`md:hidden flex items-center justify-between p-4 border-b ${
           isDark ? "border-[#1a1d26] bg-[#0d0f14]" : "border-slate-200 bg-white"
@@ -1685,7 +1690,7 @@ function ApplicationFormScreen({ currentUser, userData, onLogout, theme, toggleT
                   type="checkbox"
                   checked={appForm.termsAccepted}
                   onChange={(e) => setAppForm({ ...appForm, termsAccepted: e.target.checked })}
-                  className="w-4 h-4 mt-0.5 rounded accent-slate-900"
+                  className="w-4 h-4 mt-0.5 rounded accent-slate-900 cursor-pointer"
                 />
                 <span className="text-[11px] leading-relaxed text-slate-400">
                   <Link href="/legal" target="_blank" className={`font-semibold underline ${isDark ? "text-white" : "text-slate-900"}`}>
@@ -1831,7 +1836,7 @@ function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh, th
 
         <div className="text-center mt-4">
           <Link href="/legal" className="text-xs text-slate-400 hover:text-slate-200 underline font-mono">
-            Yasal Sözleşmeler & Kurallar
+            Yasal Sözleşmeler & Stüdyo Kuralları
           </Link>
         </div>
       </div>
@@ -1839,9 +1844,9 @@ function RestrictedAccessScreen({ currentUser, userData, onLogout, onRefresh, th
   );
 }
 
-// ==========================================
+// =========================================================
 // 4. AUTH VE ANA SAYFA KONTROLÜ
-// ==========================================
+// =========================================================
 export default function HubAuthPage() {
   const [theme, setTheme] = useState("light");
   const [isLogin, setIsLogin] = useState(true);
@@ -2038,7 +2043,7 @@ export default function HubAuthPage() {
     );
   }
 
-  // 2. YENİ KAYDOLDU AMA BAŞVURU DOLDURMADI
+  // 2. YENİ KAYDOLDU AMA BAŞVURU DOLDURMADI (ONBOARDING)
   if (currentUser && userData && userData.status === "unapplied") {
     return (
       <ApplicationFormScreen
@@ -2051,7 +2056,7 @@ export default function HubAuthPage() {
     );
   }
 
-  // 3. BAŞVURDU AMA ONAY BEKLİYOR / YASAKLI / REDDEDİLDİ
+  // 3. BAŞVURDU AMA ONAY BEKLİYOR / YASAKLI / REDDEDİLDİ (GATEKEEPER)
   if (currentUser && userData && (userData.status === "pending" || userData.status === "banned" || userData.status === "suspended" || userData.status === "rejected")) {
     return (
       <RestrictedAccessScreen
@@ -2065,7 +2070,7 @@ export default function HubAuthPage() {
     );
   }
 
-  // 4. GİRİŞ & KAYIT EKRANI
+  // 4. GİRİŞ & KAYIT FORMU
   return (
     <div className={`min-h-screen flex items-center justify-center p-6 font-sans transition-colors duration-200 ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
