@@ -14,17 +14,22 @@ export async function POST(req) {
       );
     }
 
+    // 1. KATMAN: YEREL KELİME VE İHLAL PATTERN KONTROLÜ (Hızlı Yakalayıcı)
+    const lowerMsg = (message || "").toLowerCase();
+    const badPatterns = [
+      "amk", "aq", "orospu", "piç", "sik", "yarrak", "sikeyim", "göt", "kahpe", "pezevenk",
+      "ananı", "bacını", "tehdit", "öldür", "patlat", "hackle", "ddos", "porno", "sex", "sikiş",
+      "meme", "amcık", "sürtük", "ibne", "gavat", "leak", "sızdır", "crack"
+    ];
+
+    const hasLocalViolation = badPatterns.some((w) => lowerMsg.includes(w));
+
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
     const systemInstruction = `Sen True Kinetic Studios ekibinin dahili AI asistanısın.
 KRİTİK GÜVENLİK KURALI:
-Eğer kullanıcı mesajında:
-- Hakaret, küfür, aşağılama,
-- Tehdit, şiddet, yasadışı eylemler/yazılımlar,
-- Cinsel, müstehcen, taciz veya ahlak dışı ifadeler içeriyorsa;
-KESİNLİKLE CEVAP VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" yaz ve ardından tek bir cümleyle stüdyo kurallarını ihlal ettiğini, bu eylemin yönetime raporlandığını belirt.
-
-Normal oyun geliştirme (Luau script, 3D modelleme, ses tasarımı, oyun kurgusu) sorularına ise profesyonel ve Türkçe yanıt ver.`;
+Eğer kullanıcı mesajında hakaret, küfür, tehdit, şiddet, yasadışı içerik veya cinsel ifadeler varsa;
+KESİNLİKLE YANIT VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" yaz ve "Bu mesaj stüdyo kurallarını ihlal ettiği için yönetime raporlandı." de.`;
 
     const contents = [];
 
@@ -56,31 +61,49 @@ Normal oyun geliştirme (Luau script, 3D modelleme, ses tasarımı, oyun kurgusu
 
     const data = await response.json();
 
-    // HATA VE KOTA AŞIMI KONTROLÜ
     if (!response.ok) {
-      // Eğer ücretsiz kota / dakikalık istek sınırı (Rate Limit 429) aşıldıysa:
       if (
         response.status === 429 ||
         data.error?.message?.toLowerCase().includes("quota") ||
         data.error?.status === "RESOURCE_EXHAUSTED"
       ) {
         return NextResponse.json(
-          { error: "⏳ Stüdyo AI Asistanı kısa süreli istek sınırına ulaştı (Rate Limit). Lütfen yaklaşık 20-30 saniye sonra tekrar deneyiniz." },
+          { error: "⏳ Stüdyo AI Asistanı kısa süreli istek sınırına ulaştı. Lütfen 20-30 saniye sonra tekrar deneyiniz." },
           { status: 429 }
         );
+      }
+
+      // Eğer Google API seviyesinde Safety Block yediyse:
+      if (data.error?.message?.toLowerCase().includes("safety")) {
+        return NextResponse.json({
+          reply: "⚠️ Bu mesaj güvenlik ve stüdyo kurallarını ihlal ettiği için engellenmiş ve yönetici masasına raporlanmıştır.",
+          isViolation: true
+        });
       }
 
       const errorDetail = data.error?.message || "Yapay zeka servisi şu anda yanıt veremiyor.";
       return NextResponse.json({ error: errorDetail }, { status: response.status });
     }
 
-    const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Yanıt alınamadı.";
-    const isSecurityAlert = rawReply.includes("[SECURITY_ALERT]");
-    const cleanReply = rawReply.replace("[SECURITY_ALERT]", "").trim();
+    // Google API'nin Safety Kontrolü
+    const candidate = data.candidates?.[0];
+    const isGoogleSafetyBlock = candidate?.finishReason === "SAFETY" || data.promptFeedback?.blockReason === "SAFETY";
+
+    const rawReply = candidate?.content?.parts?.[0]?.text || "";
+    const isPromptAlert = rawReply.includes("[SECURITY_ALERT]");
+
+    // 3 Koşuldan biri bile doğruysa İHLAL SAYILIR:
+    const isViolation = hasLocalViolation || isGoogleSafetyBlock || isPromptAlert;
+
+    let cleanReply = rawReply.replace("[SECURITY_ALERT]", "").trim();
+
+    if (isViolation && (!cleanReply || isGoogleSafetyBlock || hasLocalViolation)) {
+      cleanReply = "⚠️ Bu mesaj stüdyo kurallarına (küfür, tehdit, uygunsuzluk vb.) aykırı olduğu için engellenmiş ve stüdyo yönetimine bildirilmiştir.";
+    }
 
     return NextResponse.json({
-      reply: cleanReply,
-      isViolation: isSecurityAlert
+      reply: cleanReply || "Yanıt oluşturulamadı.",
+      isViolation: isViolation
     });
   } catch (error) {
     console.error("Chat route hatası:", error);

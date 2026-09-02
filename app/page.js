@@ -227,6 +227,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
 
   // AI SOHBET MESAJI GÖNDERME (GÜNCELLENMİŞ GÜVENLİ FONKSİYON)
 // AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
+// AI SOHBET MESAJI GÖNDERME & İHLAL GÜVENLİK LOGU
   const handleSendAiMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || isAiLoading) return;
@@ -248,11 +249,11 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
       });
 
       const data = await res.json();
-      if (!res.ok || data.error) {
+      if (!res.ok && !data.isViolation) {
         throw new Error(data.error || `Sunucu Hatası (${res.status})`);
       }
 
-      // KULLANICI KURAL İHLALİ YAPTIYSA (Hakaret, Tehdit, Cinsellik vb.) ADMIN LOGUNA YAZ
+      // İHLAL VARSA FIRESTORE'A HEMEN KAYDET
       if (data.isViolation) {
         try {
           await addDoc(collection(db, "security_logs"), {
@@ -263,6 +264,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
             type: "AI_INAPPROPRIATE_CONTENT",
             createdAt: serverTimestamp()
           });
+          console.log("🚨 Güvenlik İhlal Logu Başarıyla Kaydedildi!");
         } catch (logErr) {
           console.error("Güvenlik logu yazılamadı:", logErr);
         }
