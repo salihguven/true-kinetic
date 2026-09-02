@@ -14,22 +14,33 @@ export async function POST(req) {
       );
     }
 
-    // 1. KATMAN: YEREL KELİME VE İHLAL PATTERN KONTROLÜ (Hızlı Yakalayıcı)
+    // 1. KATMAN: YASADIŞI, KUMAR, KÜFÜR VE İHLAL FİLTRESİ
     const lowerMsg = (message || "").toLowerCase();
-    const badPatterns = [
+    const illegalAndBadWords = [
+      "kumar", "bahis", "casino", "slot", "rulet", "blackjack", "bet", "kaçak",
       "amk", "aq", "orospu", "piç", "sik", "yarrak", "sikeyim", "göt", "kahpe", "pezevenk",
-      "ananı", "bacını", "tehdit", "öldür", "patlat", "hackle", "ddos", "porno", "sex", "sikiş",
-      "meme", "amcık", "sürtük", "ibne", "gavat", "leak", "sızdır", "crack"
+      "ananı", "bacını", "tehdit", "öldür", "patlat", "hackle", "ddos", "rat", "trojan",
+      "porno", "sex", "sikiş", "meme", "amcık", "sürtük", "ibne", "gavat", "leak", "sızdır", "crack"
     ];
 
-    const hasLocalViolation = badPatterns.some((w) => lowerMsg.includes(w));
+    const hasDirectViolation = illegalAndBadWords.some((w) => lowerMsg.includes(w));
 
+    // Eğer doğrudan kumar/küfür/yasadışı içerik varsa Gemini'ye gitmeden ANINDA İHLAL SAY VE ENGELLE:
+    if (hasDirectViolation) {
+      return NextResponse.json({
+        reply: "⚠️ Bu mesaj stüdyo kurallarına (yasadışı içerik, kumar, hakaret veya uygunsuzluk) aykırıdır. Mesajınız engellendi ve stüdyo yönetimine raporlandı.",
+        isViolation: true
+      });
+    }
+
+    // 2. KATMAN: GOOGLE GEMINI RESMİ ENDPOINT VE SYSTEM INSTRUCTION
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-    const systemInstruction = `Sen True Kinetic Studios ekibinin dahili AI asistanısın.
-KRİTİK GÜVENLİK KURALI:
-Eğer kullanıcı mesajında hakaret, küfür, tehdit, şiddet, yasadışı içerik veya cinsel ifadeler varsa;
-KESİNLİKLE YANIT VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" yaz ve "Bu mesaj stüdyo kurallarını ihlal ettiği için yönetime raporlandı." de.`;
+    const systemPrompt = `Sen SADECE "True Kinetic Studios" oyun ve teknoloji geliştirme ekibinin dahili asistanısın.
+KESİN TALİMATLAR:
+1. YALNIZCA Roblox Luau scriptleri, Blender 3D modelleme, oyun tasarımı, ses/SFX ve stüdyo projelerine yanıt ver.
+2. Kumar, bahis, yasadışı yazılımlar, genel donanım tavsiyeleri, günlük muhabbet, küfür, hakaret ve konu dışı HER ŞEYİ KESİNLİKLE REDDET!
+3. Eğer konu dışı veya kural dışı bir şey sorulursa YALNIZCA şunu söyle: "[SECURITY_ALERT] Bu talep stüdyo kurallarına aykırıdır ve geliştirme süreçlerimizle ilgili değildir."`;
 
     const contents = [];
 
@@ -44,17 +55,20 @@ KESİNLİKLE YANIT VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" 
 
     contents.push({
       role: "user",
-      parts: [{ text: `${systemInstruction}\n\nKullanıcı Mesajı: ${message}` }]
+      parts: [{ text: message }]
     });
 
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: systemPrompt }]
+        },
         contents: contents,
         generationConfig: {
-          maxOutputTokens: 1024,
-          temperature: 0.2
+          maxOutputTokens: 800,
+          temperature: 0.1
         }
       })
     });
@@ -73,10 +87,9 @@ KESİNLİKLE YANIT VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" 
         );
       }
 
-      // Eğer Google API seviyesinde Safety Block yediyse:
       if (data.error?.message?.toLowerCase().includes("safety")) {
         return NextResponse.json({
-          reply: "⚠️ Bu mesaj güvenlik ve stüdyo kurallarını ihlal ettiği için engellenmiş ve yönetici masasına raporlanmıştır.",
+          reply: "⚠️ Bu mesaj güvenlik kurallarını ihlal ettiği için engellenmiş ve stüdyo yönetimine raporlanmıştır.",
           isViolation: true
         });
       }
@@ -85,20 +98,17 @@ KESİNLİKLE YANIT VERME! Yanıtının EN BAŞINA tam olarak "[SECURITY_ALERT]" 
       return NextResponse.json({ error: errorDetail }, { status: response.status });
     }
 
-    // Google API'nin Safety Kontrolü
     const candidate = data.candidates?.[0];
     const isGoogleSafetyBlock = candidate?.finishReason === "SAFETY" || data.promptFeedback?.blockReason === "SAFETY";
 
     const rawReply = candidate?.content?.parts?.[0]?.text || "";
     const isPromptAlert = rawReply.includes("[SECURITY_ALERT]");
 
-    // 3 Koşuldan biri bile doğruysa İHLAL SAYILIR:
-    const isViolation = hasLocalViolation || isGoogleSafetyBlock || isPromptAlert;
-
+    const isViolation = isGoogleSafetyBlock || isPromptAlert;
     let cleanReply = rawReply.replace("[SECURITY_ALERT]", "").trim();
 
-    if (isViolation && (!cleanReply || isGoogleSafetyBlock || hasLocalViolation)) {
-      cleanReply = "⚠️ Bu mesaj stüdyo kurallarına (küfür, tehdit, uygunsuzluk vb.) aykırı olduğu için engellenmiş ve stüdyo yönetimine bildirilmiştir.";
+    if (isViolation && !cleanReply) {
+      cleanReply = "⚠️ Bu talep stüdyo kurallarına (yasadışı/uygunsuz/konu dışı) aykırı olduğu için engellenmiş ve yönetime bildirilmiştir.";
     }
 
     return NextResponse.json({
