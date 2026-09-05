@@ -493,11 +493,11 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
   const hasValidWarning = userData?.warning && userData.warning.trim().length > 1 && userData.warning.trim() !== ".";
 
   return (
-    <div className={`min-h-screen flex font-sans transition-colors duration-200 overflow-x-hidden ${
+    <div className={`min-h-screen flex font-sans transition-colors duration-200 overflow-x-hidden app-shell ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
     }`}>
       {/* SOL DİKEY SIDEBAR */}
-      <aside className={`w-64 border-r shrink-0 flex flex-col justify-between p-5 transition-all duration-200 md:flex sticky top-0 h-screen ${
+      <aside className={`w-72 border-r shrink-0 flex flex-col justify-between p-5 transition-all duration-200 md:flex sticky top-0 h-screen ${
         isMobileMenuOpen ? "fixed inset-y-0 left-0 z-50 shadow-2xl flex" : "hidden md:flex"
       } ${
         isDark ? "border-[#1a1d26] bg-[#0d0f14]" : "border-slate-200 bg-white"
@@ -667,9 +667,9 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
           </div>
         </div>
 
-        <main className="flex-1 p-6 md:p-8 max-w-6xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-7">
           {/* KARŞILAMA KARTI */}
-          <div className={`p-6 sm:p-7 rounded-3xl border relative overflow-hidden transition-all shadow-xs ${
+          <div className={`p-6 sm:p-8 rounded-[1.75rem] border relative overflow-hidden transition-all shadow-xl shadow-black/10 hero-panel ${
             isDark
               ? "bg-gradient-to-br from-[#0d0f14] via-[#090b0f] to-[#07080b] border-[#1a1d26]"
               : "bg-gradient-to-br from-white via-slate-50/50 to-slate-100/60 border-slate-200/90"
@@ -765,7 +765,7 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
 
           {/* İSTATİSTİK SAYAÇLARI */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+            <div className={`p-4 rounded-2xl border transition-all metric-card ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
               <span className="text-xs font-medium text-slate-400">
                 {viewScope === "all" ? "Tüm Stüdyo İşleri" : "Eklediğim İşler"}
               </span>
@@ -774,21 +774,21 @@ function HubDashboard({ currentUser, userData, onLogout, theme, toggleTheme }) {
               </div>
             </div>
 
-            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+            <div className={`p-4 rounded-2xl border transition-all metric-card ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
               <span className="text-xs font-semibold text-amber-500 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" /> İnceleniyor
               </span>
               <div className="text-2xl font-bold text-amber-500 mt-1 tracking-tight">{pendingCount}</div>
             </div>
 
-            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+            <div className={`p-4 rounded-2xl border transition-all metric-card ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
               <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Onaylandı
               </span>
               <div className="text-2xl font-bold text-emerald-500 mt-1 tracking-tight">{approvedCount}</div>
             </div>
 
-            <div className={`p-4 rounded-2xl border transition-all ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+            <div className={`p-4 rounded-2xl border transition-all metric-card ${isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200/80 shadow-xs"}`}>
               <span className="text-xs font-semibold text-rose-500 flex items-center gap-1.5">
                 <XCircle className="w-3.5 h-3.5" /> Kabul Edilmedi
               </span>
@@ -2059,7 +2059,7 @@ export default function HubAuthPage() {
 
   // 4. GİRİŞ & KAYIT EKRANI
   return (
-    <div className={`min-h-screen flex items-center justify-center p-6 font-sans transition-colors duration-200 ${
+    <div className={`min-h-screen flex items-center justify-center p-4 sm:p-6 font-sans transition-colors duration-200 app-shell ${
       isDark ? "bg-[#07080b] text-slate-100" : "bg-[#f8fafc] text-slate-800"
     }`}>
       <div className="w-full max-w-sm">
@@ -2071,7 +2071,7 @@ export default function HubAuthPage() {
               TK
             </div>
             <div>
-              <h1 className={`font-bold text-lg tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              <h1 className={`font-heading font-bold text-lg tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                 True Kinetic Hub
               </h1>
               <p className="text-xs text-slate-400">Ekip Giriş Paneli</p>
@@ -2089,7 +2089,7 @@ export default function HubAuthPage() {
           </button>
         </div>
 
-        <div className={`p-6 rounded-3xl border shadow-xl transition-all ${
+        <div className={`p-6 sm:p-7 rounded-[1.75rem] border shadow-2xl shadow-black/10 transition-all hero-panel ${
           isDark ? "bg-[#0d0f14] border-[#1a1d26]" : "bg-white border-slate-200 shadow-sm"
         }`}>
           <div className={`grid grid-cols-2 p-1 rounded-xl mb-5 ${
@@ -2150,7 +2150,7 @@ export default function HubAuthPage() {
                     value={formData.displayName}
                     onChange={handleChange}
                     placeholder="Adınız Soyadınız"
-                    className={`w-full pl-9 pr-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
+                    className={`w-full pl-9 pr-3.5 py-3 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
                       isDark ? "bg-[#07080b] border-[#1a1d26] text-white focus:ring-white/10" : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-slate-900/10"
                     }`}
                   />
@@ -2169,7 +2169,7 @@ export default function HubAuthPage() {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="ornek@email.com"
-                  className={`w-full pl-9 pr-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
+                  className={`w-full pl-9 pr-3.5 py-3 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
                     isDark ? "bg-[#07080b] border-[#1a1d26] text-white focus:ring-white/10" : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-slate-900/10"
                   }`}
                 />
@@ -2187,7 +2187,7 @@ export default function HubAuthPage() {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className={`w-full pl-9 pr-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
+                  className={`w-full pl-9 pr-3.5 py-3 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
                     isDark ? "bg-[#07080b] border-[#1a1d26] text-white focus:ring-white/10" : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-slate-900/10"
                   }`}
                 />
