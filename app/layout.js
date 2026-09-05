@@ -12,8 +12,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-  title: "True Kinetic Studios | Sınırları Kaldırın, Fikirleri Koda Döküyoruz",
-  description: "Oyun geliştirme, Roblox varlık üretimi ve espor çözümleri sunan yeni nesil dijital stüdyo.",
+  title: "410 Gone | True Kinetic Studios",
+  description: "True Kinetic Studios web hizmetleri sonlandırılmıştır.",
 };
 
 export default function RootLayout({ children }) {
